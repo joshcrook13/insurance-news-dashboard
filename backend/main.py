@@ -12,6 +12,7 @@ import json
 import logging
 import time
 from typing import Optional
+import asyncio
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -260,58 +261,200 @@ async def health():
 
 COMPANIES = [
     # Reinsurers
-    {"name": "Swiss Re",       "initials": "SR",  "color": "#0047BB", "type": "Reinsurer",        "url": "https://www.swissre.com",        "feed_url": "https://www.swissre.com/rss/press-releases.rss"},
-    {"name": "Munich Re",      "initials": "MR",  "color": "#6B21A8", "type": "Reinsurer",        "url": "https://www.munichre.com",       "feed_url": "https://www.munichre.com/en/media-relations/news/rss.html"},
+    {
+        "name": "Swiss Re", "initials": "SR", "color": "#0047BB",
+        "type": "Reinsurer", "url": "https://www.swissre.com",
+        "rss_urls": [
+            "https://www.swissre.com/rss/news.xml",
+            "https://www.swissre.com/rss/press-releases.rss",
+        ],
+    },
+    {
+        "name": "Munich Re", "initials": "MR", "color": "#6B21A8",
+        "type": "Reinsurer", "url": "https://www.munichre.com",
+        "rss_urls": [
+            "https://www.munichre.com/en/media-relations/news-releases/rss.xml",
+            "https://www.munichre.com/en/media-relations/news/rss.html",
+        ],
+    },
     # Primary insurers
-    {"name": "Aviva",          "initials": "AV",  "color": "#0073CF", "type": "Primary Insurer",  "url": "https://www.aviva.com",          "feed_url": "https://www.aviva.com/newsroom/rss/"},
-    {"name": "Allianz",        "initials": "AZ",  "color": "#C4922A", "type": "Primary Insurer",  "url": "https://www.allianz.com",        "feed_url": "https://www.allianz.com/en/press/news/_rss.html"},
-    {"name": "Zurich",         "initials": "ZR",  "color": "#003082", "type": "Primary Insurer",  "url": "https://www.zurich.com",         "feed_url": "https://www.zurich.com/en/media/news/all-news/_jcr_content.feed"},
-    {"name": "Chubb",          "initials": "CB",  "color": "#2D7A4F", "type": "Primary Insurer",  "url": "https://www.chubb.com",          "feed_url": "https://news.chubb.com/rss/news-releases.xml"},
-    {"name": "AIG",            "initials": "AIG", "color": "#DC2626", "type": "Primary Insurer",  "url": "https://www.aig.com",            "feed_url": "https://newsroom.aig.com/rss/aig-press-releases.xml"},
+    {
+        "name": "Aviva", "initials": "AV", "color": "#0073CF",
+        "type": "Primary Insurer", "url": "https://www.aviva.com",
+        "rss_urls": ["https://www.aviva.com/newsroom/rss/"],
+    },
+    {
+        "name": "Allianz", "initials": "AZ", "color": "#C4922A",
+        "type": "Primary Insurer", "url": "https://www.allianz.com",
+        "rss_urls": [
+            "https://www.allianz.com/en/press/rss.xml",
+            "https://www.allianz.com/en/press/news/_rss.html",
+        ],
+    },
+    {
+        "name": "Zurich", "initials": "ZR", "color": "#003082",
+        "type": "Primary Insurer", "url": "https://www.zurich.com",
+        "rss_urls": ["https://www.zurich.com/en/media/news/all-news/_jcr_content.feed"],
+    },
+    {
+        "name": "Chubb", "initials": "CB", "color": "#2D7A4F",
+        "type": "Primary Insurer", "url": "https://www.chubb.com",
+        "rss_urls": [
+            "https://news.chubb.com/rss/news-releases",
+            "https://news.chubb.com/rss/news-releases.xml",
+        ],
+    },
+    {
+        "name": "AIG", "initials": "AIG", "color": "#DC2626",
+        "type": "Primary Insurer", "url": "https://www.aig.com",
+        "rss_urls": ["https://newsroom.aig.com/rss/aig-press-releases.xml"],
+    },
     # Brokers
-    {"name": "Aon",            "initials": "AN",  "color": "#C8102E", "type": "Broker",           "url": "https://www.aon.com",            "feed_url": "https://newsroom.aon.com/rss/aon-news-releases.xml"},
-    {"name": "Marsh McLennan", "initials": "MM",  "color": "#00508F", "type": "Broker",           "url": "https://www.mmc.com",            "feed_url": "https://newsroom.mmc.com/rss/mmc-news-releases.xml"},
-    {"name": "Gallagher",      "initials": "GB",  "color": "#F47A1F", "type": "Broker",           "url": "https://www.ajg.com",            "feed_url": "https://www.ajg.com/us/news-and-insights/press-releases/?format=rss"},
+    {
+        "name": "Aon", "initials": "AN", "color": "#C8102E",
+        "type": "Broker", "url": "https://www.aon.com",
+        "rss_urls": ["https://newsroom.aon.com/rss/aon-news-releases.xml"],
+    },
+    {
+        "name": "Marsh McLennan", "initials": "MM", "color": "#00508F",
+        "type": "Broker", "url": "https://www.mmc.com",
+        "rss_urls": ["https://newsroom.mmc.com/rss/mmc-news-releases.xml"],
+    },
+    {
+        "name": "Gallagher", "initials": "GB", "color": "#F47A1F",
+        "type": "Broker", "url": "https://www.ajg.com",
+        "rss_urls": ["https://www.ajg.com/us/news-and-insights/press-releases/?format=rss"],
+    },
     # Specialty
-    {"name": "Hiscox",         "initials": "HX",  "color": "#E04E39", "type": "Specialty",        "url": "https://www.hiscoxgroup.com",    "feed_url": "https://www.hiscoxgroup.com/rss/news"},
-    {"name": "Beazley",        "initials": "BZ",  "color": "#004B87", "type": "Specialty",        "url": "https://www.beazley.com",        "feed_url": "https://www.beazley.com/news.rss"},
+    {
+        "name": "Hiscox", "initials": "HX", "color": "#E04E39",
+        "type": "Specialty", "url": "https://www.hiscoxgroup.com",
+        "rss_urls": ["https://www.hiscoxgroup.com/rss/news"],
+    },
+    {
+        "name": "Beazley", "initials": "BZ", "color": "#004B87",
+        "type": "Specialty", "url": "https://www.beazley.com",
+        "rss_urls": ["https://www.beazley.com/news.rss"],
+    },
 ]
 
 _companies_cache: dict = {"data": None, "ts": 0.0}
 COMPANIES_CACHE_TTL = 3600  # 1 hour
 
+_RSS_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; InsuranceDaily/1.0; +https://insurance-daily.com)",
+    "Accept": "application/rss+xml, application/xml, text/xml, application/atom+xml, */*",
+}
+
+
+def _parse_entries(entries: list) -> list:
+    """Convert feedparser entries to our release dict format."""
+    results = []
+    for entry in entries[:8]:
+        title = (entry.get("title") or "").strip()
+        url   = (entry.get("link")  or "").strip()
+        if not title or not url:
+            continue
+        pub_date = ""
+        for attr in ("published", "updated"):
+            raw = entry.get(attr, "")
+            if raw:
+                try:
+                    pub_date = dateutil_parser.parse(raw).isoformat()
+                except Exception:
+                    pub_date = raw
+                break
+        summary = ""
+        for attr in ("summary", "description"):
+            raw = entry.get(attr, "")
+            if raw:
+                summary = BeautifulSoup(raw, "html.parser").get_text()[:200].strip()
+                break
+        results.append({"title": title, "url": url, "published": pub_date, "summary": summary})
+    return results
+
+
+def _try_rss_urls(rss_urls: list) -> list:
+    """Try each RSS URL with browser-like headers; return entries from first that works."""
+    for url in rss_urls:
+        try:
+            resp = requests.get(url, headers=_RSS_HEADERS, timeout=10)
+            if not resp.ok:
+                continue
+            feed = feedparser.parse(resp.content)
+            if feed.entries:
+                logger.info(f"RSS OK: {url} ({len(feed.entries)} entries)")
+                return _parse_entries(feed.entries)
+        except Exception as e:
+            logger.debug(f"RSS attempt failed {url}: {e}")
+    return []
+
+
+def _claude_search_fallback(company: dict) -> list:
+    """Use Claude with web_search to find 3 recent press releases when RSS fails."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return []
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        domain = company["url"].replace("https://www.", "").replace("https://", "").rstrip("/")
+        prompt = (
+            f"Search for the 3 most recent press releases or official news announcements "
+            f"from {company['name']} published in 2025 or 2026. "
+            f"Focus on their official website: {company['url']}\n\n"
+            f"Return ONLY a valid JSON array, no markdown, no explanation:\n"
+            f'[{{"title":"string","url":"string","published":"YYYY-MM-DD","summary":"one sentence"}}]'
+            f"\nIf nothing found, return: []"
+        )
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=600,
+            tools=[{"type": "web_search_20250305", "name": "web_search"}],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        for block in response.content:
+            if getattr(block, "type", None) == "text":
+                raw = block.text.strip()
+                if raw.startswith("```"):
+                    raw = raw.split("```")[1]
+                    if raw.startswith("json"):
+                        raw = raw[4:]
+                    raw = raw.strip()
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        releases = []
+                        for r in parsed[:3]:
+                            if not r.get("title"):
+                                continue
+                            releases.append({
+                                "title":     r.get("title", ""),
+                                "url":       r.get("url", company["url"]),
+                                "published": r.get("published", ""),
+                                "summary":   r.get("summary", ""),
+                            })
+                        if releases:
+                            logger.info(f"Claude search found {len(releases)} releases for {company['name']}")
+                            return releases
+                except Exception:
+                    pass
+        return []
+    except Exception as e:
+        logger.warning(f"Claude search fallback failed for {company['name']}: {e}")
+        return []
+
 
 def fetch_company_releases(company: dict) -> list:
-    releases = []
-    feed_url = company.get("feed_url", "")
-    if not feed_url:
-        return releases
+    """Fetch press releases: RSS first, then Claude web search fallback."""
     try:
-        feed = feedparser.parse(feed_url)
-        for entry in feed.entries[:10]:
-            title = (entry.get("title") or "").strip()
-            url   = (entry.get("link")  or "").strip()
-            if not title or not url:
-                continue
-            pub_date = ""
-            for attr in ("published", "updated"):
-                raw = entry.get(attr, "")
-                if raw:
-                    try:
-                        pub_date = dateutil_parser.parse(raw).isoformat()
-                    except Exception:
-                        pub_date = raw
-                    break
-            summary = ""
-            for attr in ("summary", "description"):
-                raw = entry.get(attr, "")
-                if raw:
-                    summary = BeautifulSoup(raw, "html.parser").get_text()[:200].strip()
-                    break
-            releases.append({"title": title, "url": url, "published": pub_date, "summary": summary})
+        releases = _try_rss_urls(company.get("rss_urls", []))
+        if releases:
+            return releases
+        logger.info(f"RSS empty for {company['name']}, trying Claude search")
+        return _claude_search_fallback(company)
     except Exception as e:
-        logger.warning(f"Company feed failed for {company['name']}: {e}")
-    return releases
+        logger.error(f"fetch_company_releases error for {company['name']}: {e}")
+        return []
 
 
 @app.get("/companies")
@@ -321,18 +464,28 @@ async def get_companies(force_refresh: bool = Query(False)):
         logger.info("Serving companies from cache")
         return _companies_cache["data"]
 
+    # Fetch all companies in parallel (max 4 at a time to avoid rate limits)
+    loop = asyncio.get_event_loop()
+    tasks = [
+        loop.run_in_executor(None, fetch_company_releases, company)
+        for company in COMPANIES
+    ]
+    releases_list = await asyncio.gather(*tasks, return_exceptions=True)
+
     result = []
-    for company in COMPANIES:
-        releases = fetch_company_releases(company)
+    for company, releases in zip(COMPANIES, releases_list):
+        if isinstance(releases, Exception):
+            logger.error(f"Exception for {company['name']}: {releases}")
+            releases = []
         result.append({
-            "name":         company["name"],
-            "initials":     company["initials"],
-            "color":        company["color"],
-            "type":         company["type"],
-            "url":          company["url"],
-            "releases":     releases,
+            "name":          company["name"],
+            "initials":      company["initials"],
+            "color":         company["color"],
+            "type":          company["type"],
+            "url":           company["url"],
+            "releases":      releases,
             "release_count": len(releases),
-            "last_updated": releases[0]["published"] if releases else None,
+            "last_updated":  releases[0]["published"] if releases else None,
         })
 
     response = {"companies": result, "fetched_at": datetime.utcnow().isoformat() + "Z"}

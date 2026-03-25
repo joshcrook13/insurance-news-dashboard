@@ -245,6 +245,39 @@
     }
     .tile-fresh-dot.stale { background: #D4C8B8; }
 
+    /* ── SEARCH BAR ── */
+    #company-search-wrap {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #B8A898;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+    }
+
+    #company-search {
+      width: 100%;
+      max-width: 320px;
+      background: #FDF8F0;
+      border: 1px solid #E8DDD0;
+      border-radius: 4px;
+      padding: 8px 12px 8px 32px;
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      color: #1A1A1A;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #company-search:focus { border-color: #C4922A; }
+    #company-search::placeholder { color: #B8A898; }
+
     /* ── SKELETON ── */
     @keyframes shimmer {
       0%   { background-position: -600px 0; }
@@ -562,7 +595,14 @@
         <span class="zone-title" style="opacity:0.4">Tracked Companies</span>
         <span class="zone-line"></span>
       </div>
-      <div id="companies-grid">
+      <div id="sk-grid">
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
         <div class="sk-tile skel"></div>
         <div class="sk-tile skel"></div>
         <div class="sk-tile skel"></div>
@@ -585,6 +625,16 @@
         <span class="zone-title">Tracked Companies</span>
         <span class="zone-line"></span>
         <span class="zone-meta" id="companies-meta"></span>
+      </div>
+      <div id="company-search-wrap">
+        <span class="search-icon">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <input id="company-search" type="text" placeholder="Search companies…"
+          oninput="filterCompanies(this.value)" />
       </div>
       <div id="companies-grid"></div>
     </div>
@@ -720,20 +770,37 @@
   }
 
   // ── RENDER COMPANIES ──────────────────────────────────────────────────
-  function renderCompanies(companies) {
-    $('companies-grid').innerHTML = companies.map((c, i) => {
+  // accepts an array of {company, originalIdx} pairs so modal lookup is always correct
+  function renderTiles(pairs) {
+    $('companies-grid').innerHTML = pairs.map(({ c, idx }) => {
       const fresh = isRecent(c.last_updated);
       const count = c.release_count || 0;
-      return `<div class="company-tile" style="border-top-color:${esc(c.color)}" onclick="openModal(${i})">
+      return `<div class="company-tile" style="border-top-color:${esc(c.color)}" data-idx="${idx}" onclick="openModal(${idx})">
         <div class="tile-logo" style="background:${esc(c.color)}">${esc(c.initials)}</div>
         <div class="tile-name">${esc(c.name)}</div>
         <div class="tile-type">${esc(c.type)}</div>
         <div class="tile-meta">
-          <span class="tile-count">${count} release${count !== 1 ? 's' : ''}</span>
+          <span class="tile-count">${count > 0 ? count + ' release' + (count !== 1 ? 's' : '') : 'No releases'}</span>
           ${count > 0 ? `<span class="tile-fresh-dot${fresh ? '' : ' stale'}"></span>` : ''}
         </div>
       </div>`;
     }).join('');
+  }
+
+  function renderCompanies(companies) {
+    renderTiles(companies.map((c, idx) => ({ c, idx })));
+  }
+
+  function filterCompanies(query) {
+    const q = query.toLowerCase().trim();
+    if (!q) { renderCompanies(companiesData); return; }
+    const pairs = companiesData
+      .map((c, idx) => ({ c, idx }))
+      .filter(({ c }) =>
+        c.name.toLowerCase().includes(q) ||
+        c.type.toLowerCase().includes(q)
+      );
+    renderTiles(pairs);
   }
 
   // ── LOAD COMPANIES ────────────────────────────────────────────────────
