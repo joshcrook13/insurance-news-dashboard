@@ -1,21 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import feedparser
+import anthropic
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime, timezone
-import re
+from datetime import datetime
+from dateutil import parser as dateutil_parser
 import os
 import json
 import logging
-from typing import List, Dict, Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import anthropic
+import time
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Insurance News Dashboard")
+app = FastAPI(title="Insurance Daily")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,659 +25,272 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate",
-    "Connection": "keep-alive",
-}
+# ── Cache ──────────────────────────────────────────────────────────────────
+_cache: dict = {"data": None, "ts": 0.0}
+CACHE_TTL = 1800  # 30 minutes
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def normalize_title(title: str) -> str:
-    return re.sub(r"[^a-z0-9\s]", "", title.lower()).strip()
-
-
-def titles_similar(t1: str, t2: str, threshold: float = 0.55) -> bool:
-    """Return True if two titles share enough words to be the same story."""
-    w1 = set(normalize_title(t1).split()) - {"the", "a", "an", "of", "in", "to", "and", "for", "is", "on", "at"}
-    w2 = set(normalize_title(t2).split()) - {"the", "a", "an", "of", "in", "to", "and", "for", "is", "on", "at"}
-    if not w1 or not w2:
-        return False
-    return len(w1 & w2) / min(len(w1), len(w2)) >= threshold
-
-
-DATE_FORMATS = [
-    "%B %d, %Y",   # March 20, 2026
-    "%b %d, %Y",   # Mar 20, 2026
-    "%Y-%m-%d",    # 2026-03-20
-    "%d %B %Y",    # 20 March 2026
-    "%d %b %Y",    # 20 Mar 2026
-    "%m/%d/%Y",    # 03/20/2026
-    "%d/%m/%Y",    # 20/03/2026
+# ── RSS Feeds ───────────────────────────────────────────────────────────────
+RSS_FEEDS = [
+    ("Insurance Journal",  "https://www.insurancejournal.com/feed/"),
+    ("Reinsurance News",   "https://www.reinsurancene.ws/feed/"),
+    ("Business Insurance", "https://www.businessinsurance.com/rss/news"),
+    ("The Insurer",        "https://www.theinsurer.com/feed/"),
+    ("Insurance Age",      "https://www.insuranceage.co.uk/feed"),
+    ("Post Magazine",      "https://www.postonline.co.uk/rss"),
+    ("Insurance Business", "https://www.insurancebusinessmag.com/rss/news"),
 ]
 
-def parse_date(date_str: str):
-    """Parse a date string into a datetime, or return None."""
-    if not date_str:
-        return None
-    clean = date_str.strip()
-    # Try ISO datetime first
-    try:
-        return datetime.fromisoformat(clean.rstrip("Z").replace("T", " ")[:19])
-    except Exception:
-        pass
-    for fmt in DATE_FORMATS:
+# ── Claude prompt ───────────────────────────────────────────────────────────
+CLAUDE_PROMPT = """You are an expert insurance industry analyst.
+Your job is to select and rank the most important and relevant
+insurance industry news from the list below.
+
+Rules:
+- Only include articles that are genuinely about the insurance
+  industry, insurance markets, insurers, reinsurers, brokers,
+  underwriters, regulators or insurance products
+- Exclude anything that is only tangentially related to insurance
+- Exclude duplicate stories covering the same event
+- Exclude press releases disguised as news
+- Select the top 5 most significant articles for a senior
+  insurance consultant to read today
+- Rank them by importance and market significance
+- For each selected article write:
+  * A one sentence summary (max 20 words, plain English)
+  * A consultant angle: one sentence explaining the commercial
+    implication for the insurance market (max 25 words,
+    start with why this matters e.g. 'Signals hardening in
+    cyber market...' or 'Watch for knock-on effects in...')
+  * One primary topic tag from: Property & Casualty,
+    Reinsurance, Cyber, Climate & CAT, Regulatory,
+    Life & Health, Markets, M&A
+  * A significance score 1-10
+
+Also write:
+  * A market pulse: 2-3 sentences summarising what is moving
+    in the insurance market today based on these articles.
+    Written for a senior consultant. Confident, direct,
+    no fluff. Start with the most important theme.
+  * 4-5 trending topic strings e.g. 'Hurricane Season 2026',
+    'Lloyd's Reform', 'Cyber Pricing', 'D&O Liability'
+
+Return ONLY valid JSON in this exact format, no markdown,
+no explanation:
+{
+  "market_pulse": "string",
+  "trending": ["topic1", "topic2", "topic3", "topic4"],
+  "articles": [
+    {
+      "title": "string",
+      "url": "string",
+      "source": "string",
+      "published": "string",
+      "summary": "string",
+      "consultant_angle": "string",
+      "topic": "string",
+      "significance": 8
+    }
+  ]
+}
+
+Articles to analyse:
+"""
+
+
+# ── RSS fetching ────────────────────────────────────────────────────────────
+
+def fetch_rss_articles() -> list:
+    """Fetch up to 20 articles from each RSS feed, return all sorted by date desc."""
+    articles = []
+    for source_name, feed_url in RSS_FEEDS:
         try:
-            return datetime.strptime(clean, fmt)
-        except Exception:
-            continue
-    return None
+            feed = feedparser.parse(feed_url)
+            count = 0
+            for entry in feed.entries:
+                if count >= 20:
+                    break
+                title = (entry.get("title") or "").strip()
+                url   = (entry.get("link")  or "").strip()
+                if not title or not url:
+                    continue
 
+                # Parse date — try published then updated
+                pub_date = ""
+                for attr in ("published", "updated"):
+                    raw = entry.get(attr, "")
+                    if raw:
+                        try:
+                            pub_date = dateutil_parser.parse(raw).isoformat()
+                        except Exception:
+                            pub_date = raw
+                        break
 
-def extract_date_from_url(url: str):
-    """Extract date from URL patterns like /2026/03/25/ common on IJ/CM/CJ."""
-    m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url or "")
-    if m:
-        try:
-            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
-        except Exception:
-            pass
-    return None
+                # Summary — strip HTML
+                summary = ""
+                for attr in ("summary", "description"):
+                    raw = entry.get(attr, "")
+                    if raw:
+                        summary = BeautifulSoup(raw, "html.parser").get_text()[:400].strip()
+                        break
 
-
-def best_date(article: dict):
-    """Return the best available datetime for an article."""
-    dt = parse_date(article.get("date", ""))
-    if dt:
-        return dt
-    return extract_date_from_url(article.get("url", ""))
-
-
-def recency_bonus(article: dict) -> float:
-    """Return up to +4.0 for today's articles, decaying over 7 days. -1.0 if no date at all."""
-    dt = best_date(article)
-    if not dt:
-        return -1.0  # penalise articles with no date signal
-    age_days = (datetime.utcnow() - dt).total_seconds() / 86400
-    if age_days < 0:
-        age_days = 0
-    if age_days > 7:
-        return 0.0
-    return round(4.0 * max(0.0, 1.0 - age_days / 7.0), 2)
-
-
-def first_int(text: str) -> int:
-    nums = re.findall(r"\d+", text)
-    return int(nums[0]) if nums else 0
-
-
-def make_absolute(href: str, base: str) -> str:
-    if not href:
-        return ""
-    if href.startswith("http"):
-        return href
-    if href.startswith("/"):
-        return base.rstrip("/") + href
-    return href
-
-
-def harvest_links(
-    soup: BeautifulSoup,
-    base_url: str,
-    source_name: str,
-    href_pattern: str,
-    limit: int = 25,
-) -> List[Dict[str, Any]]:
-    """Harvest article links whose href matches href_pattern regex."""
-    seen: set = set()
-    articles: List[Dict[str, Any]] = []
-    for link in soup.find_all("a", href=True):
-        href = make_absolute(link.get("href", ""), base_url)
-        if not re.search(href_pattern, href):
-            continue
-        title = link.get_text(strip=True)
-        if len(title) < 20:
-            parent = link.find_parent(["h1", "h2", "h3", "h4"])
-            if parent:
-                title = parent.get_text(strip=True)
-        if len(title) < 20 or href in seen:
-            continue
-        seen.add(href)
-        articles.append({
-            "title": title, "url": href, "source": source_name,
-            "date": "", "summary": "", "is_trending": False, "comment_count": 0,
-        })
-        if len(articles) >= limit:
-            break
-    return articles
-
-
-def _extract_articles(
-    soup: BeautifulSoup,
-    source_name: str,
-    base_url: str,
-    item_selectors: List[str],
-    fallback_href_pattern: str,
-) -> List[Dict[str, Any]]:
-    """Generic extractor: try structured selectors then fall back to links."""
-    articles: List[Dict[str, Any]] = []
-
-    items: List = []
-    for sel in item_selectors:
-        items = soup.select(sel)
-        if items:
-            break
-
-    if items:
-        for item in items[:25]:
-            title_el = item.select_one("h1, h2, h3, h4, .title, .headline, [class*='title'], [class*='headline']")
-            link_el = item.select_one("a[href]")
-            date_el = item.select_one("time, [class*='date'], [class*='time'], [datetime]")
-            summary_el = item.select_one("p, .summary, .excerpt, .teaser, [class*='summary'], [class*='excerpt']")
-            comment_el = item.select_one("[class*='comment']")
-
-            title = (title_el or link_el or item).get_text(strip=True)
-            if not title or len(title) < 15:
-                continue
-
-            href = make_absolute(link_el.get("href", "") if link_el else "", base_url)
-            date_str = date_el.get_text(strip=True) if date_el else (
-                date_el["datetime"] if date_el and date_el.get("datetime") else ""
-            )
-            summary = summary_el.get_text(strip=True)[:300] if summary_el else ""
-
-            comment_count = 0
-            if comment_el:
-                comment_count = first_int(comment_el.get_text())
-
-            classes_str = " ".join(item.get("class", [])).lower()
-            is_trending = bool(
-                item.select_one("[class*='trend'], [class*='feature'], [class*='pin'], [class*='hot'], [class*='popular'], [class*='top']")
-                or any(kw in classes_str for kw in ("trend", "feature", "pin", "hot", "popular", "top-story"))
-            )
-
-            articles.append({
-                "title": title,
-                "url": href,
-                "source": source_name,
-                "date": date_str,
-                "summary": summary,
-                "is_trending": is_trending,
-                "comment_count": comment_count,
-            })
-    else:
-        # Fallback: raw link harvest
-        seen: set = set()
-        for link in soup.select(f"a[href*='{fallback_href_pattern}']")[:30]:
-            href = make_absolute(link.get("href", ""), base_url)
-            title = link.get_text(strip=True)
-            if len(title) > 20 and href not in seen:
-                seen.add(href)
                 articles.append({
-                    "title": title,
-                    "url": href,
-                    "source": source_name,
-                    "date": "",
-                    "summary": "",
-                    "is_trending": False,
-                    "comment_count": 0,
+                    "title":     title,
+                    "url":       url,
+                    "source":    source_name,
+                    "published": pub_date,
+                    "summary":   summary,
                 })
+                count += 1
 
+        except Exception as e:
+            logger.warning(f"RSS fetch failed for {source_name}: {e}")
+
+    def sort_key(a: dict):
+        if not a.get("published"):
+            return datetime.min
+        try:
+            return dateutil_parser.parse(a["published"])
+        except Exception:
+            return datetime.min
+
+    articles.sort(key=sort_key, reverse=True)
+    logger.info(f"Fetched {len(articles)} articles across {len(RSS_FEEDS)} feeds")
     return articles
 
 
-# ---------------------------------------------------------------------------
-# Per-source scrapers
-# ---------------------------------------------------------------------------
+# ── Claude AI ───────────────────────────────────────────────────────────────
 
-def scrape_insurance_journal() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
+def call_claude_api(articles: list) -> Optional[dict]:
+    """Send articles to Claude Haiku. Returns parsed dict or None on any failure."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        logger.warning("ANTHROPIC_API_KEY not set — skipping AI processing")
+        return None
+
     try:
-        resp = requests.get("https://www.insurancejournal.com/news/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        # IJ URLs contain /news/<region>/YYYY/MM/DD/
-        articles = harvest_links(soup, "https://www.insurancejournal.com",
-                                 "Insurance Journal", r"/news/\w+/\d{4}/\d{2}/\d{2}/")
+        client = anthropic.Anthropic(api_key=api_key)
+        payload = json.dumps(articles, indent=2)
+
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": CLAUDE_PROMPT + payload}],
+        )
+
+        raw = message.content[0].text.strip()
+
+        # Strip markdown fences if Claude wrapped the JSON
+        if raw.startswith("```"):
+            parts = raw.split("```")
+            raw = parts[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        result = json.loads(raw)
+        result["ai_processed"] = True
+        logger.info("Claude AI processing succeeded")
+        return result
+
     except Exception as e:
-        logger.error(f"Insurance Journal: {e}")
-    logger.info(f"Insurance Journal: {len(articles)}")
-    return articles
+        logger.error(f"Claude API call failed: {e}")
+        return None
 
 
-def scrape_business_insurance() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
-    try:
-        resp = requests.get("https://www.businessinsurance.com/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        # Elementor-based site — extract from post cards
-        seen: set = set()
-        for card in soup.select(".elementor-post"):
-            a = card.select_one(".elementor-post__title a, h2 a, h3 a, a[href]")
-            if not a:
-                continue
-            href = make_absolute(a.get("href", ""), "https://www.businessinsurance.com")
-            title = a.get_text(strip=True)
-            date_el = card.select_one(".elementor-post__meta-data, time, [class*='date']")
-            date_str = date_el.get_text(strip=True) if date_el else ""
-            if len(title) < 20 or href in seen:
-                continue
-            seen.add(href)
-            articles.append({"title": title, "url": href, "source": "Business Insurance",
-                             "date": date_str, "summary": "", "is_trending": False, "comment_count": 0})
-        # Fallback if Elementor selectors miss
-        if not articles:
-            articles = harvest_links(soup, "https://www.businessinsurance.com",
-                                     "Business Insurance", r"businessinsurance\.com/article/")
-    except Exception as e:
-        logger.error(f"Business Insurance: {e}")
-    logger.info(f"Business Insurance: {len(articles)}")
-    return articles
+# ── Fallback ────────────────────────────────────────────────────────────────
 
-
-def scrape_carrier_management() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
-    try:
-        resp = requests.get("https://www.carriermanagement.com/news/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        articles = harvest_links(soup, "https://www.carriermanagement.com",
-                                 "Carrier Management", r"/(?:news|features)/\d{4}/\d{2}/\d{2}/")
-    except Exception as e:
-        logger.error(f"Carrier Management: {e}")
-    logger.info(f"Carrier Management: {len(articles)}")
-    return articles
-
-
-def scrape_claims_journal() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
-    try:
-        resp = requests.get("https://www.claimsjournal.com/news/national/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        articles = harvest_links(soup, "https://www.claimsjournal.com",
-                                 "Claims Journal", r"/news/\w+/\d{4}/\d{2}/\d{2}/")
-    except Exception as e:
-        logger.error(f"Claims Journal: {e}")
-    logger.info(f"Claims Journal: {len(articles)}")
-    return articles
-
-
-def scrape_insurance_business_mag() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
-    try:
-        resp = requests.get("https://www.insurancebusinessmag.com/us/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        articles = harvest_links(soup, "https://www.insurancebusinessmag.com",
-                                 "Insurance Business", r"/us/news/.*\.aspx")
-    except Exception as e:
-        logger.error(f"Insurance Business Mag: {e}")
-    logger.info(f"Insurance Business Mag: {len(articles)}")
-    return articles
-
-
-def scrape_property_casualty_360() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
-    try:
-        resp = requests.get("https://www.propertycasualty360.com/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        # PC360 URLs contain /YYYY/MM/DD/
-        articles = harvest_links(soup, "https://www.propertycasualty360.com",
-                                 "PropertyCasualty360", r"propertycasualty360\.com/\d{4}/\d{2}/\d{2}/")
-    except Exception as e:
-        logger.error(f"PropertyCasualty360: {e}")
-    logger.info(f"PropertyCasualty360: {len(articles)}")
-    return articles
-
-
-def scrape_risk_and_insurance() -> List[Dict[str, Any]]:
-    articles: List[Dict[str, Any]] = []
-    try:
-        resp = requests.get("https://riskandinsurance.com/news/", headers=HEADERS, timeout=15)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        articles = harvest_links(soup, "https://riskandinsurance.com",
-                                 "Risk & Insurance", r"riskandinsurance\.com/[a-z0-9\-]{20,}/")
-    except Exception as e:
-        logger.error(f"Risk & Insurance: {e}")
-    logger.info(f"Risk & Insurance: {len(articles)}")
-    return articles
-
-
-# ---------------------------------------------------------------------------
-# Summary enrichment — fetch meta description from article pages in parallel
-# ---------------------------------------------------------------------------
-
-def fetch_meta_description(url: str) -> str:
-    """Fetch og:description or description meta tag from an article URL."""
-    if not url:
-        return ""
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=8)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "lxml")
-        for prop in ("og:description", "description", "twitter:description"):
-            tag = soup.find("meta", attrs={"property": prop}) or soup.find("meta", attrs={"name": prop})
-            if tag and tag.get("content"):
-                return tag["content"].strip()[:300]
-    except Exception:
-        pass
-    return ""
-
-
-def enrich_summaries(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Fill in missing summaries by fetching article pages in parallel."""
-    need_summary = [a for a in articles if not a["summary"] and a["url"]]
-    if not need_summary:
-        return articles
-
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        future_to_article = {pool.submit(fetch_meta_description, a["url"]): a for a in need_summary}
-        for future in as_completed(future_to_article):
-            article = future_to_article[future]
-            try:
-                summary = future.result()
-                if summary:
-                    article["summary"] = summary
-            except Exception:
-                pass
-    return articles
-
-
-# ---------------------------------------------------------------------------
-# Scoring & deduplication
-# ---------------------------------------------------------------------------
-
-def score_and_rank(all_articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    if not all_articles:
-        return []
-
-    # Group articles that cover the same story
-    groups: List[List[Dict]] = []
-    used: set = set()
-
-    for i, article in enumerate(all_articles):
-        if i in used:
-            continue
-        group = [article]
-        used.add(i)
-        for j, other in enumerate(all_articles):
-            if j in used:
-                continue
-            if titles_similar(article["title"], other["title"]):
-                group.append(other)
-                used.add(j)
-        groups.append(group)
-
-    max_comments = max((a["comment_count"] for a in all_articles), default=1) or 1
-
-    scored: List[Dict[str, Any]] = []
-    for group in groups:
-        # Pick the representative with the richest summary
-        best = max(group, key=lambda a: len(a["summary"]))
-        sources = list({a["source"] for a in group})
-
-        score = 1.0
-        reasons: List[str] = []
-
-        # Multi-source bonus (strongest signal)
-        if len(sources) > 1:
-            score += len(sources) * 5.0
-            reasons.append(f"Reported by {len(sources)} sources: {', '.join(sources)}")
-
-        # Trending / featured bonus
-        trending_count = sum(1 for a in group if a["is_trending"])
-        if trending_count:
-            score += trending_count * 3.0
-            reasons.append("Featured / trending")
-
-        # Comment engagement bonus
-        max_comments_in_group = max(a["comment_count"] for a in group)
-        if max_comments_in_group > 0:
-            score += (max_comments_in_group / max_comments) * 4.0
-            reasons.append(f"{max_comments_in_group} comments")
-
-        # Recency bonus — today's articles score up to +4.0, decays over 7 days
-        score += recency_bonus(best)
-
-        # Page-position prominence bonus (earlier = more prominent)
-        positions = [idx for idx, a in enumerate(all_articles) if a in group]
-        if positions:
-            score += max(0.0, 2.0 - (min(positions) / 20.0))
-
-        if not reasons:
-            reasons.append("Latest news")
-
-        # Use URL-derived date if no text date
-        display_date = best["date"]
-        if not display_date:
-            dt = extract_date_from_url(best["url"])
-            if dt:
-                display_date = dt.strftime("%b %d, %Y")
-
-        scored.append({
-            "title": best["title"],
-            "source": " & ".join(sources[:2]) if len(sources) > 1 else sources[0],
-            "sources": sources,
-            "date": display_date,
-            "summary": best["summary"],
-            "url": best["url"],
-            "relevance_score": round(score, 1),
-            "trending_reason": " · ".join(reasons),
-            "is_trending": any(a["is_trending"] for a in group) or len(sources) > 1,
-            "source_count": len(sources),
-        })
-
-    scored.sort(key=lambda x: x["relevance_score"], reverse=True)
-    return scored[:10]
-
-
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
-@app.get("/news")
-async def get_news():
-    # Scrape all 5 sources in parallel
-    scrapers = [
-        scrape_insurance_journal,
-        scrape_business_insurance,
-        scrape_carrier_management,
-        scrape_claims_journal,
-        scrape_insurance_business_mag,
-        scrape_property_casualty_360,
-        scrape_risk_and_insurance,
-    ]
-
-    results: dict = {}
-    with ThreadPoolExecutor(max_workers=7) as pool:
-        futures = {pool.submit(fn): fn.__name__ for fn in scrapers}
-        for future in as_completed(futures):
-            name = futures[future]
-            try:
-                results[name] = future.result()
-            except Exception as e:
-                logger.error(f"{name} failed: {e}")
-                results[name] = []
-
-    ij   = results.get("scrape_insurance_journal", [])
-    bi   = results.get("scrape_business_insurance", [])
-    cm   = results.get("scrape_carrier_management", [])
-    cj   = results.get("scrape_claims_journal", [])
-    ibm  = results.get("scrape_insurance_business_mag", [])
-    pc   = results.get("scrape_property_casualty_360", [])
-    ri   = results.get("scrape_risk_and_insurance", [])
-
-    all_articles = ij + bi + cm + cj + ibm + pc + ri
-
-    # Drop articles older than 14 days
-    def is_fresh(a):
-        dt = best_date(a)
-        if dt is None:
-            return True
-        return (datetime.utcnow() - dt).days <= 14
-
-    all_articles = [a for a in all_articles if is_fresh(a)]
-
-    # Global top 10 — scored and ranked across all sources
-    top_10 = score_and_rank(all_articles)
-    top_10 = enrich_summaries(top_10)
-
-    # Per-source top 5 — most recent articles per source for source filtering
-    source_groups: dict = {}
-    for a in all_articles:
-        src = a["source"]
-        if src not in source_groups:
-            source_groups[src] = []
-        source_groups[src].append(a)
-
-    by_source: dict = {}
-    for src, arts in source_groups.items():
-        # Sort by date descending, take top 5
-        arts_sorted = sorted(arts, key=lambda x: best_date(x) or datetime.min, reverse=True)
-        by_source[src] = [
-            {
-                "title":      a["title"],
-                "url":        a["url"],
-                "source":     a["source"],
-                "date":       a["date"] or (best_date(a) or datetime.min).strftime("%b %d, %Y") if best_date(a) else "",
-                "summary":    a["summary"],
-                "is_trending": a["is_trending"],
-            }
-            for a in arts_sorted[:5]
-        ]
-
+def build_fallback(articles: list) -> dict:
+    """Return top 5 most recent articles without AI processing."""
     return {
-        "articles":   top_10,
-        "by_source":  by_source,
-        "fetched_at": datetime.utcnow().isoformat() + "Z",
-        "stats": {
-            "total_scraped":          len(all_articles),
-            "insurance_journal":      len(ij),
-            "business_insurance":     len(bi),
-            "carrier_management":     len(cm),
-            "claims_journal":         len(cj),
-            "insurance_business_mag": len(ibm),
-            "property_casualty_360":  len(pc),
-            "risk_and_insurance":     len(ri),
-        },
+        "market_pulse": "",
+        "trending": [],
+        "articles": [
+            {
+                "title":            a["title"],
+                "url":              a["url"],
+                "source":           a["source"],
+                "published":        a["published"],
+                "summary":          a["summary"],
+                "consultant_angle": "",
+                "topic":            "Markets",
+                "significance":     5,
+            }
+            for a in articles[:5]
+        ],
+        "ai_processed": False,
     }
 
 
-# ---------------------------------------------------------------------------
-# Categorisation — AI (Claude Haiku) with keyword fallback
-# ---------------------------------------------------------------------------
+# ── Cache logic ─────────────────────────────────────────────────────────────
 
-CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "Property & Casualty": ["property insurance","casualty","homeowner","home insurance","liability insurance","fire damage","flood claim","dwelling","p&c","contents insurance","buildings insurance","personal lines","renters insurance"],
-    "Reinsurance":         ["reinsurance","reinsurer","retrocession","treaty","facultative","swiss re","munich re","hannover re","cedent","lloyd's","retrocessionaire","cession"],
-    "Markets":             ["acquisition","merger","ipo","loss ratio","combined ratio","underwriting profit","underwriting loss","rate hardening","rate softening","premium growth","capacity","investment return","quarterly results","annual results","market hardening"],
-    "Cyber":               ["cyber insurance","ransomware","data breach","cyber attack","cyber risk","cyber liability","technology insurance","cyber claim","phishing","malware","hacking"],
-    "Climate & CAT":       ["catastrophe","hurricane","wildfire","tornado","earthquake","typhoon","flood loss","storm damage","nat cat","climate risk","esg","climate change","extreme weather","severe convective"],
-    "Life & Health":       ["life insurance","health insurance","mortality","longevity","annuity","pension","life assurance","critical illness","income protection","employee benefit","group life","medical insurance","long-term care"],
-    "Regulatory":          ["naic","fca","pra","eiopa","regulation","compliance","legislation","solvency ii","ifrs 17","insurance bill","regulatory","enforcement","licensing","government","congress","senate"],
-    "Commercial":          ["commercial insurance","workers compensation","employers liability","professional indemnity","directors and officers","d&o","public liability","commercial property","sme","trade credit","surety"],
-    "Motor":               ["motor insurance","auto insurance","car insurance","fleet insurance","telematics","electric vehicle insurance","autonomous vehicle","van insurance","road risk","motor claim","auto claim"],
-}
+def get_or_build_news(force_refresh: bool = False) -> dict:
+    now = time.time()
+    if not force_refresh and _cache["data"] and (now - _cache["ts"]) < CACHE_TTL:
+        logger.info("Serving from cache")
+        return _cache["data"]
 
-def keyword_categorise(articles: List[Dict]) -> List[Dict]:
-    results = []
-    for a in articles:
-        text = (" " + (a.get("title","") + " " + a.get("summary","")) + " ").lower()
-        cats = [cat for cat, keys in CATEGORY_KEYWORDS.items() if any(k in text for k in keys)]
-        results.append({"id": a["id"], "categories": cats or ["Markets"]})
-    return results
+    articles = fetch_rss_articles()
+    result = call_claude_api(articles)
+    if result is None:
+        result = build_fallback(articles)
+
+    result["fetched_at"] = datetime.utcnow().isoformat() + "Z"
+    _cache["data"] = result
+    _cache["ts"] = now
+    return result
 
 
-def ai_categorise(articles: List[Dict], api_key: str) -> List[Dict]:
-    client = anthropic.Anthropic(api_key=api_key)
-    articles_json = json.dumps([{"id": a["id"], "title": a["title"], "summary": a["summary"]} for a in articles])
-    prompt = (
-        "You are a senior insurance industry analyst. Categorise each article into one or more of these exact categories:\n\n"
-        "Property & Casualty — home, commercial property, liability, fire, flood, theft, personal lines, P&C\n"
-        "Reinsurance — treaty/facultative reinsurance, retrocession, cedents, Swiss Re, Munich Re, Lloyd's\n"
-        "Markets — M&A, IPOs, rate changes, combined ratios, underwriting results, capacity, investment returns, financial results\n"
-        "Cyber — ransomware, data breach, cyber insurance products, cyber attack, technology liability\n"
-        "Climate & CAT — natural catastrophes, hurricanes, wildfires, floods, earthquakes, nat cat, climate risk, ESG\n"
-        "Life & Health — life insurance, health insurance, mortality, longevity, annuities, pensions, employee benefits\n"
-        "Regulatory — NAIC, FCA, PRA, legislation, compliance, solvency, government policy, insurance bills\n"
-        "Commercial — commercial lines, workers comp, professional indemnity, D&O, SME, trade credit, surety\n"
-        "Motor — motor/auto insurance, telematics, EV insurance, fleet, autonomous vehicles\n\n"
-        "Rules:\n"
-        "- Assign only categories that clearly and directly match the article content\n"
-        "- Most articles should have 1-2 categories maximum\n"
-        "- Do NOT assign Markets unless the article is specifically about financial results, M&A, or rate movements\n"
-        "- Do NOT default to Markets — if nothing fits well, use the closest single category\n"
-        "- Return ONLY valid JSON array, no explanation, no markdown\n\n"
-        f"Articles: {articles_json}\n\n"
-        'Return format: [{"id": 0, "categories": ["Cyber"]}, ...]'
-    )
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = message.content[0].text.strip()
-    # Strip markdown code fences if model adds them
-    if raw.startswith("```"):
-        raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
-    return json.loads(raw)
+# ── Endpoints ───────────────────────────────────────────────────────────────
 
-
-@app.post("/categorise")
-def categorise(body: dict):
-    articles = body.get("articles", [])
-    if not articles:
-        return {"results": [], "method": "none"}
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if api_key:
-        try:
-            results = ai_categorise(articles, api_key)
-            logger.info("Categorisation: AI")
-            return {"results": results, "method": "ai"}
-        except Exception as e:
-            logger.error(f"AI categorisation failed, using keywords: {e}")
-
-    results = keyword_categorise(articles)
-    logger.info("Categorisation: keywords")
-    return {"results": results, "method": "keywords"}
+@app.get("/news")
+async def get_news(force_refresh: bool = Query(False)):
+    return get_or_build_news(force_refresh=force_refresh)
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "time": datetime.utcnow().isoformat() + "Z"}
+    age = (time.time() - _cache["ts"]) if _cache["ts"] else None
+    return {
+        "status":            "ok",
+        "cache_age_seconds": round(age, 1) if age else None,
+        "cached":            _cache["data"] is not None,
+    }
 
+
+# ── Keep for compatibility ───────────────────────────────────────────────────
+
+class CategoriseRequest(BaseModel):
+    articles: list
+
+@app.post("/categorise")
+async def categorise(req: CategoriseRequest):
+    return {"categorised": req.articles}
+
+
+# ── Admin invite ─────────────────────────────────────────────────────────────
 
 class InviteRequest(BaseModel):
     email: str
-
 
 @app.post("/admin/invite")
 async def admin_invite(req: InviteRequest):
     service_role_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
     supabase_url     = os.environ.get("SUPABASE_URL")
     if not service_role_key or not supabase_url:
-        raise HTTPException(status_code=503, detail="SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL not configured on server")
+        raise HTTPException(
+            status_code=503,
+            detail="SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL not configured on server",
+        )
     resp = requests.post(
         f"{supabase_url}/auth/v1/admin/users",
         headers={
             "Authorization": f"Bearer {service_role_key}",
-            "apikey": service_role_key,
-            "Content-Type": "application/json",
+            "apikey":        service_role_key,
+            "Content-Type":  "application/json",
         },
         json={"email": req.email, "invite": True},
         timeout=15,
     )
     if not resp.ok:
-        detail = resp.json().get("msg") or resp.json().get("message") or resp.text
-        raise HTTPException(status_code=resp.status_code, detail=detail)
-    return {"ok": True, "email": req.email}
+        raise HTTPException(status_code=resp.status_code, detail=resp.text)
+    return {"ok": True}
