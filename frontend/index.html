@@ -776,9 +776,9 @@
         <div class="story-grid" id="story-grid"></div>
       </div>
       <div id="brief-wrap">
-        <div class="brief-header">
-          <span class="brief-hl">Market Briefing</span>
-          <span class="brief-sub">Articles 6–10</span>
+        <div class="brief-header" id="brief-header">
+          <span class="brief-hl" id="brief-hl">Market Briefing</span>
+          <span class="brief-sub" id="brief-sub">Articles 6–10</span>
         </div>
         <div class="brief-list" id="brief-list"></div>
       </div>
@@ -952,14 +952,16 @@
     if (name === "All") {
       filtered = allArticles;
     } else {
-      const catDef = CATS.find(c => c.name === name);
       filtered = allArticles.filter(a => {
+        // Use AI categories if available, otherwise fall back to keyword matching
+        if (a._categories?.length) return a._categories.includes(name);
+        const catDef = CATS.find(c => c.name === name);
         const h = ((a.title||"")+" "+(a.summary||"")).toLowerCase();
         return catDef.keys.some(k => h.includes(k));
       });
     }
     renderContent(filtered);
-    buildSidebar(allArticles); // re-render sidebar to update active state
+    buildSidebar(allArticles);
   }
 
   // ── RENDER ──
@@ -978,6 +980,7 @@
       $("hero-wrap").innerHTML = "";
       $("grid-wrap").style.display = "none";
       $("brief-wrap").style.display = "";
+      $("brief-header").style.display = "none";
       $("brief-list").innerHTML = articles.map((a, i) => {
         const col = srcColor(a.source);
         const num = String(i + 1).padStart(2, "0");
@@ -1002,6 +1005,7 @@
     }
 
     // ── ALL VIEW: hero + grid + briefing ──
+    $("brief-header").style.display = "";
     const h = articles[0];
     $("hero-wrap").innerHTML = `
       <a class="hero-card" href="${esc(h.url)}" target="_blank" rel="noopener">
@@ -1124,12 +1128,18 @@
       }
     });
 
-    // Update sidebar counts using AI categories
+    // Store AI categories on article objects and cache by URL
     const articleCatMap = {};
     results.forEach(({ id, categories }) => {
       articleCatMap[id] = categories || [];
-      // Cache categories by URL for read tracking
-      if (articles[id]?.url) articleCategoryCache[articles[id].url] = categories || [];
+      if (articles[id]) {
+        articles[id]._categories = categories || [];
+        if (articles[id].url) articleCategoryCache[articles[id].url] = categories || [];
+      }
+    });
+    // Also update allArticles in place so selectCat uses AI categories
+    results.forEach(({ id, categories }) => {
+      if (allArticles[id]) allArticles[id]._categories = categories || [];
     });
     rebuildSidebarWithAiCats(articles, articleCatMap);
   }
