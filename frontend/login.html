@@ -6,262 +6,187 @@
   <title>Sign in — Insurance Daily</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:     #0A0F1E;
-      --bg-nav: #060B18;
-      --bg-card:#111827;
-      --border: #1E2A3A;
-      --gold:   #C9A84C;
-      --text:   #F0F4F8;
-      --muted:  #8899AA;
-      --red:    #EF4444;
-      --green:  #10B981;
-    }
 
     html, body {
       height: 100vh;
       margin: 0;
       overflow: hidden;
-    }
-
-    body {
+      background: #FDF8F0;
       font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      -webkit-font-smoothing: antialiased;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      -webkit-font-smoothing: antialiased;
     }
 
-    /* subtle grid background */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 40px 40px;
-      opacity: 0.3;
-      pointer-events: none;
+    .login-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      padding: 0 20px;
+    }
+
+    .login-logo {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 28px;
+      font-weight: 600;
+      color: #1A1A1A;
+      text-align: center;
+    }
+
+    .login-tagline {
+      font-size: 13px;
+      color: #9A8A7A;
+      margin-top: 6px;
+      text-align: center;
     }
 
     .card {
-      position: relative;
-      z-index: 1;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      background: #FDF8F0;
+      border: 1px solid #E8DDD0;
+      border-top: 3px solid #1A1A1A;
       border-radius: 8px;
-      padding: 40px 40px 36px;
-      width: 100%;
-      max-width: 400px;
-      margin: 0 20px;
+      padding: 36px 40px;
+      width: 380px;
+      max-width: 100%;
+      margin-top: 28px;
     }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 9px;
-      margin-bottom: 28px;
-    }
-
-    .logo-text {
-      font-size: 17px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.2px;
-    }
-
-    h1 {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 8px;
-      text-align: center;
-    }
-
-    .subtitle {
-      font-size: 13px;
-      color: var(--muted);
-      text-align: center;
-      line-height: 1.55;
-      margin-bottom: 28px;
-    }
-
-    /* Form */
-    #login-form { display: flex; flex-direction: column; gap: 12px; }
 
     label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
       display: block;
-      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #1A1A1A;
+      margin-bottom: 7px;
     }
 
     input[type="email"] {
       width: 100%;
-      padding: 11px 14px;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.18s;
-    }
-    input[type="email"]:focus { border-color: var(--gold); }
-    input[type="email"]::placeholder { color: #3D4F63; }
-
-    #submit-btn {
-      width: 100%;
-      padding: 12px;
-      background: var(--gold);
-      border: none;
-      border-radius: 5px;
-      color: #060B18;
+      background: #FDF8F0;
+      border: 1.5px solid #D4C8B8;
+      border-radius: 4px;
+      padding: 10px 14px;
       font-family: 'Inter', sans-serif;
       font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      cursor: pointer;
-      transition: opacity 0.18s;
-      margin-top: 4px;
+      color: #1A1A1A;
+      outline: none;
+      transition: border-color 0.15s;
     }
-    #submit-btn:hover:not(:disabled) { opacity: 0.88; }
-    #submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    input[type="email"]:focus { border-color: #1A1A1A; }
+    input[type="email"].error { border-color: #DC2626; }
+    input[type="email"]::placeholder { color: #B8A898; }
 
-    /* Error */
     #error-msg {
       display: none;
       font-size: 12px;
-      color: var(--red);
-      padding: 10px 12px;
-      background: rgba(239,68,68,0.08);
-      border: 1px solid rgba(239,68,68,0.2);
-      border-radius: 4px;
+      color: #DC2626;
+      margin-top: 7px;
     }
     #error-msg.on { display: block; }
 
-    /* Success state */
+    #submit-btn {
+      width: 100%;
+      background: #1A1A1A;
+      color: #FDF8F0;
+      border: none;
+      border-radius: 4px;
+      padding: 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: background 0.15s;
+    }
+    #submit-btn:hover:not(:disabled) { background: #333; }
+    #submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Success */
     #success-state {
       display: none;
       flex-direction: column;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
       text-align: center;
-      padding: 8px 0;
     }
     #success-state.on { display: flex; }
 
-    .success-icon {
-      width: 48px; height: 48px;
-      background: rgba(16,185,129,0.1);
-      border: 1px solid rgba(16,185,129,0.25);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 22px;
+    .success-check {
+      font-size: 28px;
+      color: #2D7A4F;
+      line-height: 1;
     }
 
     .success-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 18px;
+      color: #1A1A1A;
     }
 
     .success-sub {
       font-size: 13px;
-      color: var(--muted);
+      color: #9A8A7A;
       line-height: 1.55;
     }
 
     .back-link {
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-      margin-top: 4px;
-      cursor: pointer;
-      text-decoration: underline;
       background: none;
       border: none;
       font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: #9A8A7A;
+      cursor: pointer;
+      text-decoration: underline;
+      margin-top: 4px;
+      transition: color 0.15s;
     }
-    .back-link:hover { color: var(--text); }
+    .back-link:hover { color: #1A1A1A; }
 
-    footer {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      height: 32px;
-      background: var(--bg-nav);
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .login-footer {
       font-size: 11px;
-      color: var(--muted);
-      z-index: 1;
+      color: #9A8A7A;
+      text-align: center;
+      margin-top: 24px;
     }
   </style>
 </head>
 <body>
 
-<div class="card">
+<div class="login-wrap">
+  <div class="login-logo">Insurance Daily</div>
+  <div class="login-tagline">Intelligence for insurance professionals</div>
 
-  <div class="logo">
-    <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-      <path d="M1 8h2.5l2-5 2.5 10 2-6.5 1.5 3.5H15"
-        stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <span class="logo-text">Insurance Daily</span>
-  </div>
-
-  <h1>Sign in to Insurance Daily</h1>
-  <p class="subtitle">Enter your email to receive a secure sign-in link</p>
-
-  <!-- Form -->
-  <div id="login-form">
-    <div>
+  <div class="card">
+    <div id="login-form">
       <label for="email-input">Email address</label>
       <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email" />
+      <div id="error-msg"></div>
+      <button id="submit-btn" onclick="sendMagicLink()">Send sign-in link</button>
     </div>
-    <div id="error-msg"></div>
-    <button id="submit-btn" onclick="sendMagicLink()">Send sign-in link</button>
+
+    <div id="success-state">
+      <div class="success-check">✓</div>
+      <div class="success-title">Check your inbox</div>
+      <p class="success-sub">Your sign-in link is on its way to <span id="sent-email"></span></p>
+      <button class="back-link" onclick="resetForm()">Use a different email</button>
+    </div>
   </div>
 
-  <!-- Success -->
-  <div id="success-state">
-    <div class="success-icon">✉</div>
-    <div class="success-title">Check your inbox</div>
-    <p class="success-sub">Your sign-in link is on its way.<br>Click the link in the email to access the dashboard.</p>
-    <button class="back-link" onclick="resetForm()">Use a different email</button>
-  </div>
-
+  <div class="login-footer">Access by invitation only</div>
 </div>
 
-<footer>Insurance Daily &nbsp;·&nbsp; Invite-only access</footer>
-
 <script>
-  // ── SUPABASE CONFIG ──────────────────────────────────────────
   const SUPABASE_URL      = 'https://ogpfdrpoujrekgbrfilk.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncGZkcnBvdWpyZWtnYnJmaWxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTQxODksImV4cCI6MjA4OTk3MDE4OX0.dcE_FaWQEMlYorjj0S9M5jIGCV5U2nobmc5D0RFnApM';
-  // ────────────────────────────────────────────────────────────
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // If already logged in, go straight to dashboard
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
     if (session) window.location.replace('index.html');
@@ -271,9 +196,12 @@
     const el = document.getElementById('error-msg');
     el.textContent = msg;
     el.classList.add('on');
+    document.getElementById('email-input').classList.add('error');
   }
+
   function clearError() {
     document.getElementById('error-msg').classList.remove('on');
+    document.getElementById('email-input').classList.remove('error');
   }
 
   async function sendMagicLink() {
@@ -282,24 +210,23 @@
     if (!email) { showError('Please enter your email address.'); return; }
 
     const btn = document.getElementById('submit-btn');
-    btn.disabled = true;
+    btn.disabled    = true;
     btn.textContent = 'Sending…';
 
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: window.location.origin + '/index.html',
-      },
+      options: { emailRedirectTo: window.location.origin + '/index.html' },
     });
 
     if (error) {
       showError(error.message || 'Something went wrong. Please try again.');
-      btn.disabled = false;
+      btn.disabled    = false;
       btn.textContent = 'Send sign-in link';
       return;
     }
 
-    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('login-form').style.display    = 'none';
+    document.getElementById('sent-email').textContent      = email;
     document.getElementById('success-state').classList.add('on');
   }
 
@@ -310,7 +237,6 @@
     clearError();
   }
 
-  // Allow Enter key to submit
   document.getElementById('email-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') sendMagicLink();
   });

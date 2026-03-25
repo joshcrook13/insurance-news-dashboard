@@ -293,3 +293,59 @@ async def admin_invite(req: InviteRequest):
     if not resp.ok:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
     return {"ok": True}
+
+
+# ── Intelligence Agent ────────────────────────────────────────────────────────
+
+AGENT_SYSTEM = """You are an expert insurance industry analyst and consultant with access to web search.
+When answering questions:
+- Search for the most current information available
+- Focus specifically on insurance industry implications
+- Write in a direct, consultant-appropriate style
+- Keep answers under 150 words
+- Always cite your sources at the end
+- Start with the most important finding
+- End with one sentence on the consulting implication
+- Never use bullet points, write in flowing prose"""
+
+class AgentRequest(BaseModel):
+    query: str
+
+@app.post("/agent")
+async def agent_search(req: AgentRequest):
+    query = req.query.strip()
+    if not query:
+        return {"error": "No query provided"}
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"error": "AI service not configured"}
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=1000,
+            tools=[{"type": "web_search_20250305", "name": "web_search"}],
+            system=AGENT_SYSTEM,
+            messages=[{"role": "user", "content": query}],
+        )
+
+        answer  = ""
+        sources = []
+
+        for block in response.content:
+            if block.type == "text":
+                answer = block.text
+            if hasattr(block, "name") and block.name == "web_search":
+                if hasattr(block, "content"):
+                    for item in block.content:
+                        if hasattr(item, "url"):
+                            sources.append(item.url)
+
+        return {"answer": answer, "sources": sources[:3]}
+
+    except Exception as e:
+        logger.error(f"Agent search failed: {e}")
+        return {"error": "Search failed. Please try again."}
