@@ -29,13 +29,19 @@
       --src-multi: #C9A84C;
     }
 
-    html, body { height: 100%; }
+    html, body {
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
 
     body {
       font-family: 'Inter', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
     }
 
     /* ══════════════════════════════════════
@@ -153,8 +159,9 @@
     ══════════════════════════════════════ */
     #shell {
       display: flex;
+      flex: 1;
+      overflow: hidden;
       margin-top: 48px;
-      min-height: calc(100vh - 48px - 32px);
     }
 
     /* ══════════════════════════════════════
@@ -165,11 +172,9 @@
       flex-shrink: 0;
       background: var(--bg);
       border-right: 1px solid var(--border);
-      position: sticky;
-      top: 48px;
-      height: calc(100vh - 48px);
+      height: 100%;
       overflow-y: auto;
-      padding: 20px 0 20px;
+      padding: 20px 0;
       scrollbar-width: none;
     }
     #sidebar::-webkit-scrollbar { display: none; }
@@ -235,7 +240,11 @@
     #main {
       flex: 1;
       min-width: 0;
+      height: 100%;
+      overflow-y: auto;
       padding: 20px 24px 40px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
     }
 
     /* ── Source helpers ── */
@@ -623,6 +632,7 @@
     ══════════════════════════════════════ */
     footer {
       height: 32px;
+      flex-shrink: 0;
       background: var(--bg-nav);
       border-top: 1px solid var(--border);
       display: flex;
@@ -640,7 +650,7 @@
       .story-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 480px) {
-      #main { padding: 16px 14px 32px; }
+      #main { padding: 16px 14px 20px; }
       #nav-date { display: none; }
     }
   </style>
