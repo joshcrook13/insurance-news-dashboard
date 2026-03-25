@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import os
 import json
@@ -48,6 +48,47 @@ def titles_similar(t1: str, t2: str, threshold: float = 0.55) -> bool:
     if not w1 or not w2:
         return False
     return len(w1 & w2) / min(len(w1), len(w2)) >= threshold
+
+
+DATE_FORMATS = [
+    "%B %d, %Y",   # March 20, 2026
+    "%b %d, %Y",   # Mar 20, 2026
+    "%Y-%m-%d",    # 2026-03-20
+    "%d %B %Y",    # 20 March 2026
+    "%d %b %Y",    # 20 Mar 2026
+    "%m/%d/%Y",    # 03/20/2026
+    "%d/%m/%Y",    # 20/03/2026
+]
+
+def parse_date(date_str: str):
+    """Parse a date string into a datetime, or return None."""
+    if not date_str:
+        return None
+    clean = date_str.strip()
+    # Try ISO datetime first
+    try:
+        return datetime.fromisoformat(clean.rstrip("Z").replace("T", " ")[:19])
+    except Exception:
+        pass
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(clean, fmt)
+        except Exception:
+            continue
+    return None
+
+
+def recency_bonus(date_str: str) -> float:
+    """Return up to +4.0 for today's articles, decaying over 7 days."""
+    dt = parse_date(date_str)
+    if not dt:
+        return 0.5  # unknown date — small neutral bonus
+    age_days = (datetime.utcnow() - dt).total_seconds() / 86400
+    if age_days < 0:
+        age_days = 0
+    if age_days > 7:
+        return 0.0
+    return round(4.0 * max(0.0, 1.0 - age_days / 7.0), 2)
 
 
 def first_int(text: str) -> int:
@@ -396,6 +437,10 @@ def score_and_rank(all_articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             score += (max_comments_in_group / max_comments) * 4.0
             reasons.append(f"{max_comments_in_group} comments")
 
+        # Recency bonus — today's articles score up to +4.0, decays over 7 days
+        best_date = max((a["date"] for a in group if a.get("date")), key=lambda d: parse_date(d) or datetime.min, default="")
+        score += recency_bonus(best_date)
+
         # Page-position prominence bonus (earlier = more prominent)
         positions = [idx for idx, a in enumerate(all_articles) if a in group]
         if positions:
@@ -454,6 +499,15 @@ async def get_news():
     ibm = results.get("scrape_insurance_business_mag", [])
 
     all_articles = ij + bi + cm + cj + ibm
+
+    # Drop articles older than 14 days (keeps only fresh content)
+    def is_fresh(a):
+        dt = parse_date(a.get("date", ""))
+        if dt is None:
+            return True  # no date = keep it, benefit of the doubt
+        return (datetime.utcnow() - dt).days <= 14
+
+    all_articles = [a for a in all_articles if is_fresh(a)]
 
     # Score + pick top 10 before enriching (avoids fetching pages we discard)
     top_10 = score_and_rank(all_articles)
