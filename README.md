@@ -185,11 +185,11 @@ const SUPABASE_URL      = 'https://abcdefgh.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 ```
 
-### Add your Netlify URL to Supabase allowed redirects
+### Add your hosting URL to Supabase allowed redirects
 
 1. In Supabase → **Authentication** → **URL Configuration**
-2. Set **Site URL** to your Netlify URL (e.g. `https://your-site.netlify.app`)
-3. Under **Redirect URLs** add: `https://your-site.netlify.app/index.html`
+2. Set **Site URL** to `https://insurance-news-dashboard.josh-0c6.workers.dev`
+3. Under **Redirect URLs** add: `https://insurance-news-dashboard.josh-0c6.workers.dev/index.html`
 
 ### Invite users
 
@@ -260,14 +260,12 @@ insurance-dashboard/
 
 ---
 
-## 2 · Deploy the Frontend to Netlify (drag and drop)
+## 2 · Deploy the Frontend
 
-1. Go to [app.netlify.com](https://app.netlify.com) and sign in (free account)
-2. Click **Add new site** → **Deploy manually**
-3. Drag the **entire `frontend/` folder** onto the drag-and-drop zone
-4. Netlify will give you a URL like `https://shimmering-fox-abc123.netlify.app`
+Frontend is hosted on Cloudflare Workers at:
+**https://insurance-news-dashboard.josh-0c6.workers.dev**
 
-That's it — no build step needed.
+Deploy using Wrangler CLI or via the Cloudflare dashboard.
 
 ---
 
@@ -285,9 +283,7 @@ After deploying the backend, you need to tell the frontend where to call.
    const API_BASE = "https://your-service-name.onrender.com";
    ```
 4. Save the file
-5. Re-upload to Netlify:
-   - Go back to your Netlify site dashboard
-   - Click **Deploys** → drag the updated `frontend/` folder onto the deploy zone again
+5. Redeploy the frontend to Cloudflare Workers.
 
 The dashboard will now call the live API.
 
