@@ -262,84 +262,72 @@ async def health():
 COMPANIES = [
     # Reinsurers
     {
-        "name": "Swiss Re", "initials": "SR", "color": "#0047BB",
+        "name": "Swiss Re", "initials": "SR", "color": "#1D4ED8",
         "type": "Reinsurer", "url": "https://www.swissre.com",
-        "rss_urls": [
-            "https://www.swissre.com/rss/news.xml",
-            "https://www.swissre.com/rss/press-releases.rss",
-        ],
+        "rss_urls": ["https://www.swissre.com/dam/jcr:rss/news.xml"],
     },
     {
-        "name": "Munich Re", "initials": "MR", "color": "#6B21A8",
+        "name": "Munich Re", "initials": "MR", "color": "#DC2626",
         "type": "Reinsurer", "url": "https://www.munichre.com",
-        "rss_urls": [
-            "https://www.munichre.com/en/media-relations/news-releases/rss.xml",
-            "https://www.munichre.com/en/media-relations/news/rss.html",
-        ],
+        "rss_urls": ["https://www.munichre.com/en/media-relations/news-releases.rss.xml"],
     },
     # Primary insurers
     {
-        "name": "Aviva", "initials": "AV", "color": "#0073CF",
+        "name": "Aviva", "initials": "AV", "color": "#6366F1",
         "type": "Primary Insurer", "url": "https://www.aviva.com",
-        "rss_urls": ["https://www.aviva.com/newsroom/rss/"],
+        "rss_urls": [],  # web search only
     },
     {
-        "name": "Allianz", "initials": "AZ", "color": "#C4922A",
+        "name": "Allianz", "initials": "AZ", "color": "#7C3AED",
         "type": "Primary Insurer", "url": "https://www.allianz.com",
-        "rss_urls": [
-            "https://www.allianz.com/en/press/rss.xml",
-            "https://www.allianz.com/en/press/news/_rss.html",
-        ],
+        "rss_urls": ["https://www.allianz.com/en/press/rss.xml"],
     },
     {
-        "name": "Zurich", "initials": "ZR", "color": "#003082",
+        "name": "Zurich", "initials": "ZR", "color": "#0891B2",
         "type": "Primary Insurer", "url": "https://www.zurich.com",
-        "rss_urls": ["https://www.zurich.com/en/media/news/all-news/_jcr_content.feed"],
+        "rss_urls": [],  # web search only
     },
     {
         "name": "Chubb", "initials": "CB", "color": "#2D7A4F",
         "type": "Primary Insurer", "url": "https://www.chubb.com",
-        "rss_urls": [
-            "https://news.chubb.com/rss/news-releases",
-            "https://news.chubb.com/rss/news-releases.xml",
-        ],
+        "rss_urls": [],  # web search only
     },
     {
-        "name": "AIG", "initials": "AIG", "color": "#DC2626",
+        "name": "AIG", "initials": "AIG", "color": "#F59E0B",
         "type": "Primary Insurer", "url": "https://www.aig.com",
-        "rss_urls": ["https://newsroom.aig.com/rss/aig-press-releases.xml"],
+        "rss_urls": [],  # web search only
     },
     # Brokers
     {
-        "name": "Aon", "initials": "AN", "color": "#C8102E",
+        "name": "Aon", "initials": "AN", "color": "#EC4899",
         "type": "Broker", "url": "https://www.aon.com",
-        "rss_urls": ["https://newsroom.aon.com/rss/aon-news-releases.xml"],
+        "rss_urls": [],  # web search only
     },
     {
-        "name": "Marsh McLennan", "initials": "MM", "color": "#00508F",
+        "name": "Marsh McLennan", "initials": "MM", "color": "#8B5CF6",
         "type": "Broker", "url": "https://www.mmc.com",
-        "rss_urls": ["https://newsroom.mmc.com/rss/mmc-news-releases.xml"],
+        "rss_urls": [],  # web search only
     },
     {
-        "name": "Gallagher", "initials": "GB", "color": "#F47A1F",
+        "name": "Gallagher", "initials": "GB", "color": "#D97706",
         "type": "Broker", "url": "https://www.ajg.com",
-        "rss_urls": ["https://www.ajg.com/us/news-and-insights/press-releases/?format=rss"],
+        "rss_urls": [],  # web search only
     },
     # Specialty
     {
-        "name": "Hiscox", "initials": "HX", "color": "#E04E39",
+        "name": "Hiscox", "initials": "HX", "color": "#DC2626",
         "type": "Specialty", "url": "https://www.hiscoxgroup.com",
-        "rss_urls": ["https://www.hiscoxgroup.com/rss/news"],
+        "rss_urls": [],  # web search only
     },
     {
-        "name": "Beazley", "initials": "BZ", "color": "#004B87",
+        "name": "Beazley", "initials": "BZ", "color": "#0F766E",
         "type": "Specialty", "url": "https://www.beazley.com",
-        "rss_urls": ["https://www.beazley.com/news.rss"],
+        "rss_urls": [],  # web search only
     },
 ]
 
 _companies_cache: dict = {"data": None, "ts": 0.0}
-COMPANIES_CACHE_TTL = 3600  # 1 hour
+COMPANIES_CACHE_TTL = 7200  # 2 hours
 
 _RSS_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; InsuranceDaily/1.0; +https://insurance-daily.com)",
@@ -399,12 +387,13 @@ def _claude_search_fallback(company: dict) -> list:
         client = anthropic.Anthropic(api_key=api_key)
         domain = company["url"].replace("https://www.", "").replace("https://", "").rstrip("/")
         prompt = (
-            f"Search for the 3 most recent press releases or official news announcements "
-            f"from {company['name']} published in 2025 or 2026. "
-            f"Focus on their official website: {company['url']}\n\n"
-            f"Return ONLY a valid JSON array, no markdown, no explanation:\n"
-            f'[{{"title":"string","url":"string","published":"YYYY-MM-DD","summary":"one sentence"}}]'
-            f"\nIf nothing found, return: []"
+            f'Search for: {company["name"]} press release 2026 insurance\n\n'
+            f"Find the 3 most recent press releases or official news from {company['name']} "
+            f"({company['url']}). Include any from 2025 if 2026 results are sparse.\n\n"
+            f"Return ONLY a valid JSON array — no markdown, no explanation, no prose:\n"
+            f'[{{"title":"exact headline","url":"direct link to article","published":"YYYY-MM-DD","summary":"one sentence describing what was announced"}}]\n\n'
+            f"You MUST return at least 1 result. If you cannot find press releases from their "
+            f"official site, use any reputable news source covering {company['name']}."
         )
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
