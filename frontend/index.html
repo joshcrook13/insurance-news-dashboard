@@ -285,7 +285,7 @@
     #main::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
     .content-wrap {
-      max-width: 760px;
+      width: 100%;
     }
 
     /* ════════════════════════════════════════
@@ -309,9 +309,9 @@
        MARKET PULSE
     ════════════════════════════════════════ */
     #market-pulse {
-      padding: 0 0 28px;
+      border-left: 4px solid var(--gold);
+      padding: 0 0 0 20px;
       margin-bottom: 28px;
-      border-bottom: 1px solid var(--border);
     }
 
     .pulse-eyebrow {
@@ -337,35 +337,41 @@
 
     #pulse-text {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 19px;
+      font-size: 22px;
       font-weight: 400;
       color: var(--text);
-      line-height: 1.65;
+      line-height: 1.6;
       margin-bottom: 16px;
     }
 
     .pulse-footer {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 16px;
-      flex-wrap: wrap;
+      overflow: hidden;
     }
 
     #trending-pills {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex: 1;
+      min-width: 0;
     }
+    #trending-pills::-webkit-scrollbar { display: none; }
 
     .trend-pill {
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 500;
-      padding: 3px 10px;
+      padding: 2px 9px;
       border: 1px solid var(--border-mid);
       border-radius: 100px;
       color: var(--text-2);
       user-select: none;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .pulse-meta {
@@ -412,7 +418,7 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 20px 24px;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
       cursor: pointer;
       transition: background 0.15s, border-color 0.15s;
       opacity: 0;
@@ -444,13 +450,7 @@
       gap: 8px;
     }
 
-    .card-rank {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-3);
-      font-variant-numeric: tabular-nums;
-      min-width: 20px;
-    }
+    .card-rank { display: none; }
 
     .topic-badge {
       font-size: 10px;
@@ -510,27 +510,28 @@
       overflow: hidden;
     }
 
-    /* Consultant angle — blockquote style */
+    /* Consultant angle */
     .consultant-angle {
-      border-left: 2px solid var(--gold-line);
-      padding: 2px 0 2px 14px;
-      margin-bottom: 0;
+      border-left: 2px solid #C9A84C;
+      background: #0A1628;
+      padding: 6px 12px;
+      margin-top: 10px;
+      border-radius: 0 4px 4px 0;
     }
 
     .angle-label {
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 600;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.09em;
       text-transform: uppercase;
-      color: var(--gold);
+      color: rgba(201,168,76,0.5);
       margin-bottom: 3px;
     }
 
     .angle-text {
       font-size: 13px;
-      color: var(--text-2);
-      line-height: 1.55;
-      font-style: italic;
+      color: #8899AA;
+      line-height: 1.5;
     }
 
     /* ════════════════════════════════════════
