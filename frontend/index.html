@@ -645,6 +645,25 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
+    .cat-pending {
+      color: #4B5563;
+      background: var(--border);
+      border: 1px solid transparent;
+      animation: pulse-cat 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-cat {
+      0%,100% { opacity: 1; }
+      50%      { opacity: 0.4; }
+    }
+
+    .ai-badge {
+      background: rgba(201,168,76,0.12);
+      color: var(--gold);
+      border: 1px solid rgba(201,168,76,0.3);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
     /* empty filtered state */
     .no-results {
       padding: 32px 0;
@@ -878,8 +897,14 @@
     return matched.length ? matched : ["Markets"];
   }
 
-  function catTagsHtml(cats, max = 2) {
-    return cats.slice(0, max).map(c => `<span class="cat-tag">${esc(c)}</span>`).join("");
+  function catTagsHtml(cats, max = 2, ai = false) {
+    const tags = cats.slice(0, max).map(c => `<span class="cat-tag">${esc(c)}</span>`).join("");
+    const badge = ai ? `<span class="cat-tag ai-badge">AI</span>` : "";
+    return tags + badge;
+  }
+
+  function pendingTagsHtml() {
+    return `<span class="cat-tag cat-pending">Categorising…</span>`;
   }
 
   // ── SIDEBAR ──
@@ -943,7 +968,7 @@
         <div class="hero-title">${esc(h.title)}</div>
         <div class="hero-summary">${esc(h.summary) || "Click to read the full article."}</div>
         <div class="hero-foot">
-          <div class="hero-cats">${catTagsHtml(hCats, 3)}</div>
+          <div class="hero-cats" id="a-cats-0">${pendingTagsHtml()}</div>
           <span class="hero-cta">Read full article →</span>
         </div>
       </a>`;
@@ -951,10 +976,9 @@
     // Grid (articles 1–4)
     const gridArts = articles.slice(1, 5);
     if (gridArts.length) {
-      $("story-grid").innerHTML = gridArts.map(a => {
+      $("story-grid").innerHTML = gridArts.map((a, i) => {
         const cc = srcCardClass(a.source);
         const col = srcColor(a.source);
-        const cats = getCategories(a);
         return `
           <a class="story-card ${cc}" href="${esc(a.url)}" target="_blank" rel="noopener">
             <div class="story-top">
@@ -964,7 +988,7 @@
             </div>
             <div class="story-title">${esc(a.title)}</div>
             <div class="story-summary">${esc(a.summary) || ""}</div>
-            <div class="story-foot">${catTagsHtml(cats)}</div>
+            <div class="story-foot" id="a-cats-${i + 1}">${pendingTagsHtml()}</div>
           </a>`;
       }).join("");
       $("grid-wrap").style.display = "";
@@ -977,7 +1001,6 @@
     if (briefArts.length) {
       $("brief-list").innerHTML = briefArts.map((a, i) => {
         const col = srcColor(a.source);
-        const cats = getCategories(a);
         const num = String(i + 1).padStart(2, "0");
         return `
           <a class="brief-row" href="${esc(a.url)}" target="_blank" rel="noopener">
@@ -985,9 +1008,9 @@
             <span class="src-dot" style="background:${col}"></span>
             <div class="brief-center">
               <div class="brief-title">${esc(a.title)}</div>
-              <div class="brief-meta">
+              <div class="brief-meta" id="a-cats-${i + 5}">
                 <span class="brief-src">${esc(a.source)}</span>
-                ${cats.slice(0,1).map(c=>`<span class="cat-tag">${esc(c)}</span>`).join("")}
+                ${pendingTagsHtml()}
               </div>
             </div>
             <div class="brief-right">
@@ -1000,6 +1023,81 @@
     } else {
       $("brief-wrap").style.display = "none";
     }
+  }
+
+  // ── AI CATEGORISATION ──
+  async function categoriseArticles(articles) {
+    const payload = articles.map((a, i) => ({
+      id: i,
+      title: a.title || "",
+      summary: a.summary || "",
+    }));
+
+    let results, isAi = false;
+
+    try {
+      const res = await fetch(`${API_BASE}/categorise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ articles: payload }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      results = data.results;
+      isAi = data.method === "ai";
+    } catch(e) {
+      console.warn("Categorise endpoint failed, using frontend keywords:", e);
+      results = payload.map(a => ({ id: a.id, categories: getCategories(articles[a.id]) }));
+      isAi = false;
+    }
+
+    // Update DOM for each article
+    results.forEach(({ id, categories }) => {
+      const el = $(`a-cats-${id}`);
+      if (!el) return;
+      const cats = categories?.length ? categories : ["Markets"];
+      // Brief rows (5-9) have source name already inside — just append tags
+      if (id >= 5) {
+        const src = el.querySelector(".brief-src");
+        el.innerHTML = "";
+        if (src) el.appendChild(src);
+        cats.slice(0, 1).forEach(c => {
+          const span = document.createElement("span");
+          span.className = "cat-tag";
+          span.textContent = c;
+          el.appendChild(span);
+        });
+        if (isAi) {
+          const ai = document.createElement("span");
+          ai.className = "cat-tag ai-badge";
+          ai.textContent = "AI";
+          el.appendChild(ai);
+        }
+      } else {
+        el.innerHTML = catTagsHtml(cats, id === 0 ? 3 : 2, isAi);
+      }
+    });
+
+    // Update sidebar counts using AI categories
+    const articleCatMap = {};
+    results.forEach(({ id, categories }) => { articleCatMap[id] = categories || []; });
+    rebuildSidebarWithAiCats(articles, articleCatMap);
+  }
+
+  function rebuildSidebarWithAiCats(articles, catMap) {
+    const counts = { All: articles.length };
+    for (const cat of CATS) {
+      if (cat.name === "All") continue;
+      counts[cat.name] = Object.values(catMap).filter(cats => cats.includes(cat.name)).length;
+    }
+    $("cat-nav").innerHTML = CATS.map(cat => `
+      <div class="cat-row${activeCat === cat.name ? " active" : ""}"
+           onclick="selectCat('${esc(cat.name)}')">
+        <span class="cat-name">${esc(cat.name)}</span>
+        <span class="cat-count">${counts[cat.name] || 0}</span>
+      </div>
+    `).join("");
   }
 
   // ── STATE ──
@@ -1039,6 +1137,8 @@
       renderContent(allArticles);
       buildSidebar(allArticles);
       setState("loaded");
+      // Fire-and-forget: categorise in background, updates DOM when ready
+      categoriseArticles(allArticles);
     } catch(e) {
       console.error(e);
       setState("error");

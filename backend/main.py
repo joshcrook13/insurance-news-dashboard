@@ -4,9 +4,12 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import re
+import os
+import json
 import logging
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import anthropic
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,7 +19,7 @@ app = FastAPI(title="Insurance News Dashboard")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -469,6 +472,77 @@ async def get_news():
             "insurance_business_mag": len(ibm),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Categorisation — AI (Claude Haiku) with keyword fallback
+# ---------------------------------------------------------------------------
+
+CATEGORY_KEYWORDS: Dict[str, List[str]] = {
+    "Property & Casualty": ["property","casualty","liability","home","fire","flood","theft","damage","p&c","dwelling","homeowner"],
+    "Reinsurance":         ["reinsurance","reinsurer","retrocession","treaty","facultative","swiss re","munich re","cedent","lloyd's"],
+    "Markets":             ["investment","acquisition","merger","premium","rate","pricing","revenue","profit","loss ratio","combined ratio","ipo"],
+    "Cyber":               ["cyber","ransomware","data breach","hack","malware","technology","digital"," ai ","cloud","phishing"],
+    "Climate & CAT":       ["climate","catastrophe"," cat ","flood","wildfire","hurricane","tornado","earthquake","storm","esg","net zero"],
+    "Life & Health":       ["life","health","medical","mortality","longevity","annuity","pension","benefit","wellness","mental health"],
+    "Regulatory":          ["naic","fca","regulatory","regulation","compliance","legislation","bill"," law ","ruling","mandate","solvency"],
+    "Commercial":          ["commercial","corporate","enterprise","workers compensation","employer","sme"],
+    "Motor":               ["motor","auto","vehicle"," car ","truck","fleet"," ev ","autonomous","telematics","road"],
+}
+
+def keyword_categorise(articles: List[Dict]) -> List[Dict]:
+    results = []
+    for a in articles:
+        text = (" " + (a.get("title","") + " " + a.get("summary","")) + " ").lower()
+        cats = [cat for cat, keys in CATEGORY_KEYWORDS.items() if any(k in text for k in keys)]
+        results.append({"id": a["id"], "categories": cats or ["Markets"]})
+    return results
+
+
+def ai_categorise(articles: List[Dict], api_key: str) -> List[Dict]:
+    client = anthropic.Anthropic(api_key=api_key)
+    articles_json = json.dumps([{"id": a["id"], "title": a["title"], "summary": a["summary"]} for a in articles])
+    prompt = (
+        "You are an insurance industry expert. Categorise each article into one or more of these exact categories:\n"
+        "Property & Casualty, Reinsurance, Markets, Cyber, Climate & CAT, Life & Health, Regulatory, Commercial, Motor\n\n"
+        "Rules:\n"
+        "- Each article MUST have at least one category\n"
+        "- Each article can have multiple categories if genuinely relevant\n"
+        "- Be precise — only assign categories that clearly match\n"
+        "- Return ONLY valid JSON, no explanation, no markdown\n\n"
+        f"Articles: {articles_json}\n\n"
+        'Return format: [{"id": 0, "categories": ["Markets", "Reinsurance"]}, ...]'
+    )
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = message.content[0].text.strip()
+    # Strip markdown code fences if model adds them
+    if raw.startswith("```"):
+        raw = re.sub(r"^```[a-z]*\n?", "", raw).rstrip("`").strip()
+    return json.loads(raw)
+
+
+@app.post("/categorise")
+def categorise(body: dict):
+    articles = body.get("articles", [])
+    if not articles:
+        return {"results": [], "method": "none"}
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if api_key:
+        try:
+            results = ai_categorise(articles, api_key)
+            logger.info("Categorisation: AI")
+            return {"results": results, "method": "ai"}
+        except Exception as e:
+            logger.error(f"AI categorisation failed, using keywords: {e}")
+
+    results = keyword_categorise(articles)
+    logger.info("Categorisation: keywords")
+    return {"results": results, "method": "keywords"}
 
 
 @app.get("/health")

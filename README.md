@@ -4,7 +4,23 @@ A live dashboard that scrapes **Insurance Journal**, **Business Insurance**, and
 
 ---
 
-## 0 · Supabase Auth Setup (invite-only magic link)
+## 0a · Anthropic API Key Setup (AI categorisation)
+
+### Add ANTHROPIC_API_KEY to Render
+
+1. Go to your Render dashboard → click your **insurance-news-dashboard** service
+2. Click **Environment** in the left menu
+3. Click **Add Environment Variable**
+4. Key: `ANTHROPIC_API_KEY` · Value: your key from console.anthropic.com
+5. Click **Save Changes** — Render will automatically redeploy
+
+The key is used server-side only and never exposed to the frontend.
+
+If the key is missing or the API call fails, the backend silently falls back to keyword-based categorisation.
+
+---
+
+## 0b · Supabase Auth Setup (invite-only magic link)
 
 ### Create a free Supabase project
 
