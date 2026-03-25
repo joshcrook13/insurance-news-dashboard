@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     /* ── Reset & variables ── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -153,6 +154,31 @@
     }
     #refresh-btn.spinning .ri { animation: spin 0.65s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    #nav-user-email {
+      font-size: 11px;
+      color: var(--muted);
+      max-width: 160px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #signout-btn {
+      padding: 6px 13px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.18s, color 0.18s;
+    }
+    #signout-btn:hover { border-color: var(--muted); color: var(--text); }
 
     /* ══════════════════════════════════════
        PAGE SHELL — two columns below nav
@@ -670,6 +696,7 @@
   <span id="nav-date"></span>
   <div class="nav-gap"></div>
   <div class="nav-right">
+    <span id="nav-user-email"></span>
     <div class="live-pill">
       <div id="live-dot"></div>
       Live
@@ -677,6 +704,7 @@
     <button id="refresh-btn" onclick="loadNews()">
       <span class="ri">↻</span> Refresh
     </button>
+    <button id="signout-btn" onclick="signOut()">Sign out</button>
   </div>
 </nav>
 
@@ -747,10 +775,34 @@
 
 <script>
   // ── CONFIG ───────────────────────────────────────────────────
-  const API_BASE = "https://insurance-news-dashboard.onrender.com";
+  const API_BASE          = "https://insurance-news-dashboard.onrender.com";
+  const SUPABASE_URL      = 'YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
   // ─────────────────────────────────────────────────────────────
 
-  const $ = id => document.getElementById(id);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const $  = id => document.getElementById(id);
+
+  // ── AUTH ──
+  async function initAuth() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      window.location.replace('login.html');
+      return false;
+    }
+    // Show user email in nav
+    $("nav-user-email").textContent = session.user.email;
+    // Listen for session expiry
+    sb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') window.location.replace('login.html');
+    });
+    return true;
+  }
+
+  async function signOut() {
+    await sb.auth.signOut();
+    window.location.replace('login.html');
+  }
 
   // ── CATEGORY DEFINITIONS ──
   const CATS = [
@@ -998,7 +1050,7 @@
   }
 
   setNavDate();
-  loadNews();
+  initAuth().then(ok => { if (ok) loadNews(); });
 </script>
 </body>
 </html>

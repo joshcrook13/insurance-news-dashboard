@@ -2,6 +2,67 @@
 
 A live dashboard that scrapes **Insurance Journal**, **Business Insurance**, and **Insurance News Net**, scores articles by trending signals, and surfaces the top 10 most popular stories.
 
+---
+
+## 0 · Supabase Auth Setup (invite-only magic link)
+
+### Create a free Supabase project
+
+1. Go to [supabase.com](https://supabase.com) → **Start your project** → sign in with GitHub
+2. Click **New project**, give it a name (e.g. `insurance-daily`), choose a region, set a database password → **Create new project**
+3. Wait ~1 minute for the project to provision
+
+### Find your Supabase URL and anon key
+
+1. In your Supabase project → click **Project Settings** (gear icon, left sidebar)
+2. Click **API**
+3. Copy:
+   - **Project URL** → this is your `SUPABASE_URL`
+   - **anon / public** key → this is your `SUPABASE_ANON_KEY`
+
+### Disable public sign-ups (invite only)
+
+1. In Supabase → **Authentication** → **Providers** → **Email**
+2. Toggle **Enable Email provider** ON
+3. Toggle **Confirm email** ON
+4. In Supabase → **Authentication** → **Settings**
+5. Set **Enable Sign Ups** to **OFF** — this blocks anyone not invited
+
+### Update the config in both HTML files
+
+Open `frontend/index.html` and `frontend/login.html`. In each file find:
+
+```js
+const SUPABASE_URL      = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+```
+
+Replace the placeholder strings with your actual values. Example:
+
+```js
+const SUPABASE_URL      = 'https://abcdefgh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+```
+
+### Add your Netlify URL to Supabase allowed redirects
+
+1. In Supabase → **Authentication** → **URL Configuration**
+2. Set **Site URL** to your Netlify URL (e.g. `https://your-site.netlify.app`)
+3. Under **Redirect URLs** add: `https://your-site.netlify.app/index.html`
+
+### Invite users
+
+Only invited users can access the dashboard — there is no self sign-up.
+
+1. In Supabase → **Authentication** → **Users**
+2. Click **Invite user**
+3. Enter the user's email address → **Send invitation**
+4. They receive an email with a magic link
+5. Clicking it logs them in and redirects to the dashboard
+6. All subsequent sign-ins use the same magic link flow from `login.html`
+
+---
+
 ```
 insurance-dashboard/
 ├── backend/
