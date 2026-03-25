@@ -256,6 +256,80 @@ async def health():
     }
 
 
+# ── Companies ────────────────────────────────────────────────────────────────
+
+COMPANIES = [
+    {"name": "Swiss Re",  "initials": "SR",  "color": "#1D4ED8", "type": "Reinsurer",       "url": "https://www.swissre.com",   "feed_url": "https://www.swissre.com/rss/press-releases.rss"},
+    {"name": "Munich Re", "initials": "MR",  "color": "#7C3AED", "type": "Reinsurer",       "url": "https://www.munichre.com",  "feed_url": "https://www.munichre.com/en/media-relations/news/rss.html"},
+    {"name": "AIG",       "initials": "AIG", "color": "#DC2626", "type": "Primary Insurer", "url": "https://www.aig.com",       "feed_url": "https://newsroom.aig.com/rss/aig-press-releases.xml"},
+    {"name": "Chubb",     "initials": "CB",  "color": "#2D7A4F", "type": "Primary Insurer", "url": "https://www.chubb.com",     "feed_url": "https://news.chubb.com/rss/news-releases.xml"},
+    {"name": "Allianz",   "initials": "AZ",  "color": "#C4922A", "type": "Primary Insurer", "url": "https://www.allianz.com",  "feed_url": "https://www.allianz.com/en/press/news/_rss.html"},
+]
+
+_companies_cache: dict = {"data": None, "ts": 0.0}
+COMPANIES_CACHE_TTL = 3600  # 1 hour
+
+
+def fetch_company_releases(company: dict) -> list:
+    releases = []
+    feed_url = company.get("feed_url", "")
+    if not feed_url:
+        return releases
+    try:
+        feed = feedparser.parse(feed_url)
+        for entry in feed.entries[:10]:
+            title = (entry.get("title") or "").strip()
+            url   = (entry.get("link")  or "").strip()
+            if not title or not url:
+                continue
+            pub_date = ""
+            for attr in ("published", "updated"):
+                raw = entry.get(attr, "")
+                if raw:
+                    try:
+                        pub_date = dateutil_parser.parse(raw).isoformat()
+                    except Exception:
+                        pub_date = raw
+                    break
+            summary = ""
+            for attr in ("summary", "description"):
+                raw = entry.get(attr, "")
+                if raw:
+                    summary = BeautifulSoup(raw, "html.parser").get_text()[:200].strip()
+                    break
+            releases.append({"title": title, "url": url, "published": pub_date, "summary": summary})
+    except Exception as e:
+        logger.warning(f"Company feed failed for {company['name']}: {e}")
+    return releases
+
+
+@app.get("/companies")
+async def get_companies(force_refresh: bool = Query(False)):
+    now = time.time()
+    if not force_refresh and _companies_cache["data"] and (now - _companies_cache["ts"]) < COMPANIES_CACHE_TTL:
+        logger.info("Serving companies from cache")
+        return _companies_cache["data"]
+
+    result = []
+    for company in COMPANIES:
+        releases = fetch_company_releases(company)
+        result.append({
+            "name":         company["name"],
+            "initials":     company["initials"],
+            "color":        company["color"],
+            "type":         company["type"],
+            "url":          company["url"],
+            "releases":     releases,
+            "release_count": len(releases),
+            "last_updated": releases[0]["published"] if releases else None,
+        })
+
+    response = {"companies": result, "fetched_at": datetime.utcnow().isoformat() + "Z"}
+    _companies_cache["data"] = response
+    _companies_cache["ts"]   = now
+    return response
+
+
 # ── Keep for compatibility ───────────────────────────────────────────────────
 
 class CategoriseRequest(BaseModel):

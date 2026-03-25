@@ -467,6 +467,30 @@
       border-radius: 3px;
     }
 
+    /* ── TAB BAR ── */
+    #tab-bar {
+      flex-shrink: 0;
+      background: #FDF8F0;
+      border-bottom: 1px solid #E8DDD0;
+      padding: 0 40px;
+      display: flex;
+      gap: 0;
+    }
+
+    .tab-link {
+      padding: 11px 16px 9px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #9A8A7A;
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-link:hover { color: #1A1A1A; }
+    .tab-link.active { color: #1A1A1A; border-bottom-color: #1A1A1A; }
+
     /* ── FOOTER ── */
     #footer {
       height: 36px;
@@ -596,6 +620,12 @@
       <button id="signout-btn" onclick="signOut()">Sign out</button>
     </div>
   </nav>
+
+  <!-- TAB BAR -->
+  <div id="tab-bar">
+    <a class="tab-link active" href="index.html">Market Briefing</a>
+    <a class="tab-link" href="companies.html">Company Intelligence</a>
+  </div>
 
   <!-- BODY -->
   <div id="body">

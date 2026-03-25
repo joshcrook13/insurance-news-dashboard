@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Company Intelligence — Insurance Daily</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      background: #FDF8F0;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: #1A1A1A;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    #nav {
+      height: 52px;
+      flex-shrink: 0;
+      background: #FDF8F0;
+      border-bottom: 2px solid #1A1A1A;
+      display: flex;
+      align-items: center;
+      padding: 0 40px;
+      gap: 12px;
+    }
+
+    .nav-wordmark {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #1A1A1A;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .nav-pipe { color: #D4C8B8; font-size: 14px; flex-shrink: 0; }
+
+    #nav-date {
+      font-size: 11px;
+      color: #9A8A7A;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .nav-gap { flex: 1; }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+
+    #nav-user-email { font-size: 11px; color: #9A8A7A; }
+
+    .live-indicator { display: flex; align-items: center; gap: 5px; }
+
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #2D7A4F;
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .live-text { font-size: 11px; font-weight: 500; color: #2D7A4F; }
+
+    #admin-btn {
+      background: transparent;
+      border: 1px solid #C4922A;
+      color: #C4922A;
+      border-radius: 4px;
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      text-decoration: none;
+      display: none;
+      transition: background 0.15s;
+    }
+    #admin-btn:hover { background: rgba(196,146,42,0.08); }
+
+    #refresh-btn {
+      display: flex; align-items: center; gap: 5px;
+      background: #1A1A1A;
+      color: #FDF8F0;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 14px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #refresh-btn:hover:not(:disabled) { background: #333; }
+    #refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #signout-btn {
+      background: transparent; border: none;
+      color: #9A8A7A; font-size: 11px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer; transition: color 0.15s;
+    }
+    #signout-btn:hover { color: #6B5B4E; }
+
+    .spin { animation: rotate 0.7s linear infinite; }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+
+    /* ── TAB BAR ── */
+    #tab-bar {
+      flex-shrink: 0;
+      background: #FDF8F0;
+      border-bottom: 1px solid #E8DDD0;
+      padding: 0 40px;
+      display: flex;
+      gap: 0;
+    }
+
+    .tab-link {
+      padding: 11px 16px 9px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #9A8A7A;
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-link:hover { color: #1A1A1A; }
+    .tab-link.active { color: #1A1A1A; border-bottom-color: #1A1A1A; }
+
+    /* ── BODY ── */
+    #body {
+      flex: 1;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #E8DDD0 transparent;
+      padding: 28px 40px 32px;
+    }
+    #body::-webkit-scrollbar { width: 4px; }
+    #body::-webkit-scrollbar-thumb { background: #D4C8B8; border-radius: 2px; }
+
+    /* ── ZONE HEADER ── */
+    .zone-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .zone-title {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.12em;
+      color: #1A1A1A; white-space: nowrap;
+    }
+
+    .zone-line { flex: 1; height: 1px; background: #1A1A1A; }
+
+    .zone-meta { font-size: 10px; color: #9A8A7A; white-space: nowrap; }
+
+    /* ── COMPANY GRID ── */
+    #companies-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 700px) {
+      #companies-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .company-tile {
+      border: 1px solid #E8DDD0;
+      border-top: 3px solid #ccc;
+      border-radius: 6px;
+      background: #FDF8F0;
+      padding: 20px;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      user-select: none;
+    }
+    .company-tile:hover {
+      background: #F5EEE2;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .tile-logo {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .tile-name {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 16px; font-weight: 600;
+      color: #1A1A1A;
+      line-height: 1.2;
+    }
+
+    .tile-type {
+      font-size: 11px; color: #9A8A7A;
+      margin-top: 3px;
+    }
+
+    .tile-meta {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 14px;
+    }
+
+    .tile-count {
+      font-size: 11px; font-weight: 500;
+      color: #6B5B4E;
+    }
+
+    .tile-fresh-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #2D7A4F;
+      flex-shrink: 0;
+    }
+    .tile-fresh-dot.stale { background: #D4C8B8; }
+
+    /* ── SKELETON ── */
+    @keyframes shimmer {
+      0%   { background-position: -600px 0; }
+      100% { background-position: 600px 0; }
+    }
+
+    .skel {
+      background: linear-gradient(90deg, #EDE5D8 25%, #F5EEE2 50%, #EDE5D8 75%);
+      background-size: 600px 100%;
+      animation: shimmer 1.5s ease-in-out infinite;
+      border-radius: 3px;
+    }
+
+    .sk-tile {
+      border: 1px solid #E8DDD0;
+      border-top: 3px solid #E8DDD0;
+      border-radius: 6px;
+      padding: 20px;
+      height: 130px;
+    }
+
+    /* ── ERROR ── */
+    #state-error {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 80px 0; gap: 12px; text-align: center;
+    }
+
+    .error-mark { font-size: 32px; color: #C4922A; line-height: 1; }
+
+    .error-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 18px; color: #1A1A1A;
+    }
+
+    .error-sub { font-size: 13px; color: #9A8A7A; }
+
+    .retry-btn {
+      background: #1A1A1A; color: #FDF8F0; border: none;
+      border-radius: 4px; padding: 10px 22px;
+      font-size: 12px; font-weight: 500;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      margin-top: 4px; transition: background 0.15s;
+    }
+    .retry-btn:hover { background: #333; }
+
+    /* ── MODAL ── */
+    #modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(26,26,26,0.45);
+      z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.on { display: flex; }
+
+    #modal {
+      background: #FDF8F0;
+      border: 1px solid #E8DDD0;
+      border-top: 3px solid #ccc;
+      border-radius: 8px;
+      width: 560px;
+      max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 80px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex; align-items: center; gap: 14px;
+      padding: 20px 24px 18px;
+      border-bottom: 1px solid #E8DDD0;
+      flex-shrink: 0;
+    }
+
+    .modal-logo {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600;
+      color: #fff; flex-shrink: 0;
+    }
+
+    .modal-company-info { flex: 1; min-width: 0; }
+
+    .modal-company-name {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 18px; font-weight: 600; color: #1A1A1A;
+    }
+
+    .modal-source-link {
+      font-size: 11px; color: #9A8A7A;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .modal-source-link:hover { color: #1A1A1A; }
+
+    .modal-close {
+      background: none; border: none;
+      font-size: 20px; color: #9A8A7A;
+      cursor: pointer; padding: 0; line-height: 1;
+      transition: color 0.12s; flex-shrink: 0;
+    }
+    .modal-close:hover { color: #1A1A1A; }
+
+    .modal-body {
+      overflow-y: auto; flex: 1;
+      padding: 0 24px 20px;
+      scrollbar-width: thin;
+      scrollbar-color: #D4C8B8 transparent;
+    }
+    .modal-body::-webkit-scrollbar { width: 3px; }
+    .modal-body::-webkit-scrollbar-thumb { background: #D4C8B8; }
+
+    .modal-empty {
+      padding: 40px 0;
+      text-align: center;
+      font-size: 13px; color: #9A8A7A;
+    }
+
+    .release-item {
+      padding: 14px 0;
+      border-bottom: 1px solid #E8DDD0;
+      cursor: pointer;
+      transition: background 0.12s, padding-left 0.12s, padding-right 0.12s,
+                  margin-left 0.12s, margin-right 0.12s, border-radius 0.12s;
+    }
+    .release-item:last-child { border-bottom: none; }
+    .release-item:hover {
+      background: #F5EEE2;
+      padding-left: 8px; padding-right: 8px;
+      margin-left: -8px; margin-right: -8px;
+      border-radius: 4px;
+    }
+
+    .release-title {
+      font-size: 14px; font-weight: 500;
+      color: #1A1A1A; line-height: 1.4;
+    }
+
+    .release-meta {
+      font-size: 11px; color: #9A8A7A; margin-top: 4px;
+    }
+
+    .release-summary {
+      font-size: 12px; color: #5A4A3E;
+      line-height: 1.55; margin-top: 5px;
+    }
+
+    .modal-footer {
+      padding: 12px 24px;
+      border-top: 1px solid #E8DDD0;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .modal-footer-label { font-size: 11px; color: #9A8A7A; }
+
+    .modal-view-all {
+      font-size: 11px; font-weight: 500;
+      color: #1A1A1A; text-decoration: none;
+      transition: color 0.15s;
+    }
+    .modal-view-all:hover { color: #C4922A; }
+
+    /* ── AGENT ZONE ── */
+    #agent-zone {
+      flex-shrink: 0;
+      background: #FAF4EA;
+      border-top: 2px solid #1A1A1A;
+      padding: 18px 40px 20px;
+    }
+
+    .agent-header { display: flex; align-items: baseline; gap: 10px; }
+
+    .agent-title {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.12em; color: #1A1A1A;
+    }
+
+    .agent-sub { font-size: 11px; color: #9A8A7A; }
+
+    .agent-input-row { display: flex; gap: 8px; margin-top: 10px; }
+
+    #agent-input {
+      flex: 1;
+      background: #FDF8F0;
+      border: 1.5px solid #1A1A1A;
+      border-radius: 5px;
+      padding: 10px 14px;
+      font-size: 13px; font-family: 'Inter', sans-serif;
+      color: #1A1A1A; outline: none;
+      transition: border-color 0.15s;
+    }
+    #agent-input:focus { border-color: #C4922A; }
+    #agent-input::placeholder { color: #B8A898; }
+    #agent-input:disabled { opacity: 0.6; }
+
+    #agent-btn {
+      background: #1A1A1A; color: #FDF8F0;
+      border: none; border-radius: 5px;
+      padding: 10px 20px;
+      font-size: 12px; font-weight: 500; font-family: 'Inter', sans-serif;
+      cursor: pointer; white-space: nowrap;
+      transition: background 0.15s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    #agent-btn:hover:not(:disabled) { background: #333; }
+    #agent-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .agent-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+    .chip {
+      background: #EDE5D8; color: #6B5B4E;
+      font-size: 11px; font-weight: 500;
+      padding: 4px 10px; border-radius: 3px;
+      cursor: pointer; border: 1px solid transparent;
+      transition: border-color 0.12s, color 0.12s; user-select: none;
+    }
+    .chip:hover { border-color: #C4922A; color: #C4922A; }
+    .chip.disabled { opacity: 0.5; pointer-events: none; }
+
+    #agent-results {
+      max-height: 180px; overflow-y: auto;
+      margin-top: 12px;
+      scrollbar-width: thin; scrollbar-color: #D4C8B8 transparent;
+    }
+    #agent-results::-webkit-scrollbar { width: 3px; }
+    #agent-results::-webkit-scrollbar-thumb { background: #D4C8B8; }
+
+    .agent-result {
+      background: #FDF8F0; border: 1px solid #E8DDD0;
+      border-left: 3px solid #C4922A; border-radius: 4px;
+      padding: 14px 16px; margin-bottom: 8px; position: relative;
+    }
+    .agent-result:last-child { margin-bottom: 0; }
+
+    .result-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px; margin-bottom: 8px;
+    }
+
+    .result-query {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; color: #9A8A7A;
+    }
+
+    .result-clear {
+      background: none; border: none; font-size: 14px;
+      color: #9A8A7A; cursor: pointer; line-height: 1;
+      padding: 0; flex-shrink: 0; transition: color 0.12s;
+    }
+    .result-clear:hover { color: #1A1A1A; }
+
+    .result-answer { font-size: 13px; line-height: 1.65; color: #1A1A1A; }
+
+    .result-sources { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+    .result-source-tag {
+      font-size: 10px; color: #9A8A7A;
+      background: #EDE5D8; padding: 2px 8px; border-radius: 3px;
+    }
+
+    /* ── FOOTER ── */
+    #footer {
+      height: 36px; flex-shrink: 0;
+      background: #1A1A1A; padding: 0 40px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .footer-left { font-size: 10px; color: #4A4A4A; }
+    .footer-right { font-size: 10px; color: #3A3A3A; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- NAV -->
+  <nav id="nav">
+    <span class="nav-wordmark">Insurance Daily</span>
+    <span class="nav-pipe">|</span>
+    <span id="nav-date"></span>
+    <div class="nav-gap"></div>
+    <div class="nav-right">
+      <span id="nav-user-email"></span>
+      <span class="live-indicator">
+        <span class="live-dot"></span>
+        <span class="live-text">Live</span>
+      </span>
+      <a id="admin-btn" href="admin.html">Admin</a>
+      <button id="refresh-btn" onclick="loadCompanies()">
+        <svg id="refresh-icon" width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M10.5 6a4.5 4.5 0 1 1-1.06-2.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M10.5 2v2.5H8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Refresh
+      </button>
+      <button id="signout-btn" onclick="signOut()">Sign out</button>
+    </div>
+  </nav>
+
+  <!-- TAB BAR -->
+  <div id="tab-bar">
+    <a class="tab-link" href="index.html">Market Briefing</a>
+    <a class="tab-link active" href="companies.html">Company Intelligence</a>
+  </div>
+
+  <!-- BODY -->
+  <div id="body">
+
+    <!-- LOADING -->
+    <div id="state-loading">
+      <div class="zone-header">
+        <span class="zone-title" style="opacity:0.4">Tracked Companies</span>
+        <span class="zone-line"></span>
+      </div>
+      <div id="companies-grid">
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+        <div class="sk-tile skel"></div>
+      </div>
+    </div>
+
+    <!-- ERROR -->
+    <div id="state-error" style="display:none">
+      <div class="error-mark">!</div>
+      <div class="error-title">Unable to load companies</div>
+      <div class="error-sub">Please check your connection and try again</div>
+      <button class="retry-btn" onclick="loadCompanies()">Retry</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="state-content" style="display:none">
+      <div class="zone-header">
+        <span class="zone-title">Tracked Companies</span>
+        <span class="zone-line"></span>
+        <span class="zone-meta" id="companies-meta"></span>
+      </div>
+      <div id="companies-grid"></div>
+    </div>
+
+  </div>
+
+  <!-- AGENT ZONE -->
+  <div id="agent-zone">
+    <div class="agent-header">
+      <span class="agent-title">Intelligence Agent</span>
+      <span class="agent-sub">Ask about any company in the insurance market</span>
+    </div>
+    <div class="agent-input-row">
+      <input id="agent-input" type="text"
+        placeholder="e.g. What are Swiss Re's latest Q1 results? or Chubb cyber underwriting strategy…" />
+      <button id="agent-btn" onclick="agentSearch()">Search →</button>
+    </div>
+    <div class="agent-chips" id="agent-chips">
+      <span class="chip" data-query="Swiss Re Q1 2026 results and outlook" onclick="setQuery(this)">Swiss Re Q1 2026 results</span>
+      <span class="chip" data-query="Munich Re natural catastrophe exposure 2026" onclick="setQuery(this)">Munich Re nat cat 2026</span>
+      <span class="chip" data-query="Chubb cyber underwriting strategy 2026" onclick="setQuery(this)">Chubb cyber strategy</span>
+      <span class="chip" data-query="Compare Allianz vs AIG market position and performance" onclick="setQuery(this)">Allianz vs AIG</span>
+    </div>
+    <div id="agent-results" style="display:none"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer id="footer">
+    <span class="footer-left">Swiss Re · Munich Re · AIG · Chubb · Allianz</span>
+    <span class="footer-right">Built with Claude Code</span>
+  </footer>
+
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="closeModal()">
+  <div id="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-logo" id="modal-logo"></div>
+      <div class="modal-company-info">
+        <div class="modal-company-name" id="modal-name"></div>
+        <a class="modal-source-link" id="modal-link" href="#" target="_blank"></a>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <span class="modal-footer-label" id="modal-footer-label"></span>
+      <a class="modal-view-all" id="modal-view-all" href="#" target="_blank">View all releases ↗</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ────────────────────────────────────────────────────────────
+  const API_BASE          = "https://insurance-news-dashboard.onrender.com";
+  const SUPABASE_URL      = 'https://ogpfdrpoujrekgbrfilk.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncGZkcnBvdWpyZWtnYnJmaWxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTQxODksImV4cCI6MjA4OTk3MDE4OX0.dcE_FaWQEMlYorjj0S9M5jIGCV5U2nobmc5D0RFnApM';
+  // ─────────────────────────────────────────────────────────────────────
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const $  = id => document.getElementById(id);
+
+  // ── AUTH ─────────────────────────────────────────────────────────────
+  async function initAuth() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.replace('login.html'); return false; }
+    const { data: profile } = await sb
+      .from('profiles').select('status, role').eq('id', session.user.id).single();
+    if (profile && profile.status === 'inactive') {
+      await sb.auth.signOut(); window.location.replace('login.html'); return false;
+    }
+    $('nav-user-email').textContent = session.user.email;
+    if (profile && profile.role === 'admin') $('admin-btn').style.display = '';
+    sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', session.user.id).then(() => {});
+    sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') window.location.replace('login.html'); });
+    return true;
+  }
+
+  async function signOut() {
+    await sb.auth.signOut();
+    window.location.replace('login.html');
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────
+  function setNavDate() {
+    const d = new Date();
+    const days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    $('nav-date').textContent = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  function timeAgo(raw) {
+    if (!raw) return '';
+    try {
+      const diff = Math.floor((Date.now() - new Date(raw)) / 60000);
+      if (diff < 1)    return 'Just now';
+      if (diff < 60)   return `${diff}m ago`;
+      if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+      return `${Math.floor(diff/1440)}d ago`;
+    } catch (_) { return ''; }
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function srcDomain(url) {
+    try { return new URL(url).hostname.replace('www.', ''); }
+    catch (_) { return url.slice(0, 40); }
+  }
+
+  function isRecent(iso) {
+    if (!iso) return false;
+    try { return (Date.now() - new Date(iso)) < 48 * 3600 * 1000; }
+    catch (_) { return false; }
+  }
+
+  // ── STATE ─────────────────────────────────────────────────────────────
+  let companiesData = [];
+
+  function setState(name) {
+    ['state-loading','state-error','state-content'].forEach(id => {
+      $(id).style.display = id === `state-${name}` ? '' : 'none';
+    });
+  }
+
+  function setRefreshing(on) {
+    $('refresh-btn').disabled = on;
+    $('refresh-icon').classList.toggle('spin', on);
+  }
+
+  // ── RENDER COMPANIES ──────────────────────────────────────────────────
+  function renderCompanies(companies) {
+    $('companies-grid').innerHTML = companies.map((c, i) => {
+      const fresh = isRecent(c.last_updated);
+      const count = c.release_count || 0;
+      return `<div class="company-tile" style="border-top-color:${esc(c.color)}" onclick="openModal(${i})">
+        <div class="tile-logo" style="background:${esc(c.color)}">${esc(c.initials)}</div>
+        <div class="tile-name">${esc(c.name)}</div>
+        <div class="tile-type">${esc(c.type)}</div>
+        <div class="tile-meta">
+          <span class="tile-count">${count} release${count !== 1 ? 's' : ''}</span>
+          ${count > 0 ? `<span class="tile-fresh-dot${fresh ? '' : ' stale'}"></span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── LOAD COMPANIES ────────────────────────────────────────────────────
+  async function loadCompanies() {
+    setState('loading');
+    setRefreshing(true);
+    try {
+      const ctrl    = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 55000);
+      const resp    = await fetch(`${API_BASE}/companies`, { signal: ctrl.signal });
+      clearTimeout(timeout);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      companiesData = data.companies || [];
+      renderCompanies(companiesData);
+      $('companies-meta').textContent = `${companiesData.length} companies tracked`;
+      setState('content');
+    } catch (e) {
+      console.error(e);
+      setState('error');
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  // ── MODAL ─────────────────────────────────────────────────────────────
+  function openModal(idx) {
+    const c = companiesData[idx];
+    if (!c) return;
+
+    $('modal').style.borderTopColor = c.color;
+    $('modal-logo').style.background = c.color;
+    $('modal-logo').textContent = c.initials;
+    $('modal-name').textContent = c.name;
+    $('modal-link').href = c.url;
+    $('modal-link').textContent = srcDomain(c.url) + ' ↗';
+    $('modal-view-all').href = c.url;
+    $('modal-footer-label').textContent = c.type;
+
+    const releases = c.releases || [];
+    if (!releases.length) {
+      $('modal-body').innerHTML = '<div class="modal-empty">No press releases available</div>';
+    } else {
+      $('modal-body').innerHTML = releases.map(r => {
+        const ta = timeAgo(r.published);
+        return `<div class="release-item" onclick="window.open('${esc(r.url)}','_blank')">
+          <div class="release-title">${esc(r.title)}</div>
+          ${ta ? `<div class="release-meta">${ta}</div>` : ''}
+          ${r.summary ? `<div class="release-summary">${esc(r.summary)}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    $('modal-overlay').classList.add('on');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeModal() {
+    $('modal-overlay').classList.remove('on');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // ── AGENT ─────────────────────────────────────────────────────────────
+  let agentResults = [];
+  let resultId     = 0;
+
+  function setAgentLoading(on) {
+    $('agent-input').disabled = on;
+    $('agent-btn').disabled   = on;
+    $('agent-btn').textContent = on ? 'Searching…' : 'Search →';
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('disabled', on));
+  }
+
+  function setQuery(el) {
+    $('agent-input').value = el.dataset.query;
+    agentSearch();
+  }
+
+  async function agentSearch() {
+    const query = $('agent-input').value.trim();
+    if (!query) return;
+    setAgentLoading(true);
+    try {
+      const resp = await fetch(`${API_BASE}/agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      agentResults.unshift({ id: resultId++, query, answer: data.answer || '', sources: data.sources || [] });
+      if (agentResults.length > 5) agentResults.pop();
+    } catch (_) {
+      agentResults.unshift({ id: resultId++, query, answer: 'Unable to search right now. Please try again.', sources: [] });
+      if (agentResults.length > 5) agentResults.pop();
+    } finally {
+      setAgentLoading(false);
+      $('agent-input').value = '';
+      renderAgentResults();
+    }
+  }
+
+  function removeResult(id) {
+    agentResults = agentResults.filter(r => r.id !== id);
+    renderAgentResults();
+  }
+
+  function renderAgentResults() {
+    const el = $('agent-results');
+    if (!agentResults.length) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.innerHTML = agentResults.map(r => `
+      <div class="agent-result">
+        <div class="result-header">
+          <span class="result-query">${esc(r.query)}</span>
+          <button class="result-clear" onclick="removeResult(${r.id})">×</button>
+        </div>
+        <div class="result-answer">${esc(r.answer)}</div>
+        ${r.sources && r.sources.length ? `<div class="result-sources">
+          ${r.sources.map(s => `<span class="result-source-tag">${esc(srcDomain(s))}</span>`).join('')}
+        </div>` : ''}
+      </div>`).join('');
+  }
+
+  document.getElementById('agent-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') agentSearch();
+  });
+
+  // ── INIT ──────────────────────────────────────────────────────────────
+  setNavDate();
+  initAuth().then(ok => { if (ok) loadCompanies(); });
+</script>
+</body>
+</html>
