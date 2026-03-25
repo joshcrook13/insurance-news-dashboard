@@ -689,6 +689,9 @@
     </div>
 
     <div id="skeleton">
+      <p id="wake-msg" style="font-size:12px;color:var(--muted);margin-bottom:14px;display:none;">
+        ⏳ Waking up server — first load may take up to 45 seconds on the free tier…
+      </p>
       <div class="sk sk-hero"></div>
       <div class="sk-grid">
         <div class="sk sk-gcard"></div>
@@ -951,8 +954,19 @@
   // ── LOAD ──
   async function loadNews() {
     setState("loading");
+
+    // Show "waking up" hint after 6 seconds
+    const wakeTimer = setTimeout(() => {
+      const msg = $("wake-msg");
+      if (msg) msg.style.display = "block";
+    }, 6000);
+
     try {
-      const res = await fetch(`${API_BASE}/news`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
+
+      const res = await fetch(`${API_BASE}/news`, { signal: controller.signal });
+      clearTimeout(timeout);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data.articles?.length) throw new Error("empty");
@@ -966,6 +980,10 @@
     } catch(e) {
       console.error(e);
       setState("error");
+    } finally {
+      clearTimeout(wakeTimer);
+      const msg = $("wake-msg");
+      if (msg) msg.style.display = "none";
     }
   }
 
