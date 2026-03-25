@@ -720,6 +720,7 @@
       <div id="live-dot"></div>
       Live
     </div>
+    <a id="admin-btn" href="admin.html" style="display:none;padding:6px 13px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--gold);font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;text-decoration:none;transition:border-color 0.18s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">Admin</a>
     <button id="refresh-btn" onclick="loadNews()">
       <span class="ri">↻</span> Refresh
     </button>
@@ -812,7 +813,7 @@
     // Check profile status (revoked users are blocked)
     const { data: profile } = await sb
       .from('profiles')
-      .select('status')
+      .select('status, role')
       .eq('id', session.user.id)
       .single();
     if (profile && profile.status === 'inactive') {
@@ -822,6 +823,8 @@
     }
     // Show user email in nav
     $("nav-user-email").textContent = session.user.email;
+    // Show admin button if admin
+    if (profile && profile.role === 'admin') $("admin-btn").style.display = "";
     // Update last_seen (fire and forget)
     sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', session.user.id).then(() => {});
     // Listen for session expiry
