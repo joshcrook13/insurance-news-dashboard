@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Insurance Daily — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0A0F1E;
+      --bg-nav:    #060B18;
+      --bg-card:   #111827;
+      --bg-hover:  #0D1525;
+      --border:    #1E2A3A;
+      --gold:      #C9A84C;
+      --text:      #F0F4F8;
+      --muted:     #8899AA;
+      --green:     #10B981;
+      --red:       #EF4444;
+    }
+    html, body { height: 100vh; margin: 0; overflow: hidden; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── NAV ── */
+    #nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 48px;
+      background: var(--bg-nav);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      z-index: 200;
+      gap: 10px;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+    .nav-divider { color: var(--border); font-size: 16px; margin: 0 2px; }
+    .nav-section {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    .nav-gap { flex: 1; }
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+    #nav-user-email {
+      font-size: 11px;
+      color: var(--muted);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nav-btn {
+      padding: 6px 13px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.18s, color 0.18s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .nav-btn:hover { border-color: var(--muted); color: var(--text); }
+
+    /* ── PAGE SCROLL ── */
+    #page {
+      margin-top: 48px;
+      flex: 1;
+      overflow-y: auto;
+      padding: 28px 32px 60px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    /* ── SECTION ── */
+    .section { margin-bottom: 32px; }
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── STAT CARDS ── */
+    .stat-row { display: flex; gap: 14px; flex-wrap: wrap; }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px 20px;
+      flex: 1;
+      min-width: 150px;
+    }
+    .stat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-value.gold  { color: var(--gold); }
+    .stat-value.green { color: var(--green); }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    /* ── TABLE ── */
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tbl th {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 10px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .tbl td {
+      padding: 11px 18px;
+      border-bottom: 1px solid rgba(30,42,58,0.6);
+      color: var(--text);
+      vertical-align: middle;
+    }
+    .tbl tr:last-child td { border-bottom: none; }
+    .tbl tr:hover td { background: var(--bg-hover); }
+    .tbl tr.self td { background: rgba(201,168,76,0.04); }
+    .tbl tr.self { border-left: 2px solid var(--gold); }
+    .tbl tr.inactive td { opacity: 0.4; }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 3px;
+    }
+    .badge-admin    { background: rgba(201,168,76,0.15);  color: var(--gold); }
+    .badge-user     { background: var(--border);          color: var(--muted); }
+    .badge-active   { background: rgba(16,185,129,0.12);  color: var(--green); }
+    .badge-inactive { background: rgba(239,68,68,0.1);    color: var(--red); }
+    .badge-on       { background: rgba(16,185,129,0.12);  color: var(--green); }
+    .badge-off      { background: var(--border);          color: var(--muted); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 4px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 1px solid;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover   { opacity: 0.8; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-danger  { background: rgba(239,68,68,0.1);  border-color: rgba(239,68,68,0.3);  color: var(--red); }
+    .btn-success { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: var(--green); }
+    .btn-primary { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.3); color: var(--gold); }
+
+    /* ── INVITE FORM ── */
+    .inline-form {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      padding: 13px 18px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .inline-form input {
+      flex: 1;
+      min-width: 160px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 7px 12px;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.18s;
+    }
+    .inline-form input:focus { border-color: var(--gold); }
+    .inline-form input::placeholder { color: var(--muted); }
+
+    /* ── TOGGLE ── */
+    .toggle {
+      width: 36px; height: 20px;
+      background: var(--border);
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle.on { background: rgba(16,185,129,0.2); }
+    .toggle.on::after { transform: translateX(16px); background: var(--green); }
+
+    /* ── MISC ── */
+    .tbl-loading { padding: 24px 18px; color: var(--muted); font-size: 13px; }
+    .empty-state { padding: 32px 18px; text-align: center; color: var(--muted); font-size: 13px; }
+    .top-cat-bar {
+      padding: 11px 18px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── FLASH ── */
+    #flash {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      padding: 12px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      z-index: 9999;
+      display: none;
+      max-width: 340px;
+    }
+    #flash.success { border-color: var(--green); color: var(--green); }
+    #flash.error   { border-color: var(--red);   color: var(--red); }
+  </style>
+</head>
+<body>
+
+<nav id="nav">
+  <a class="nav-logo" href="index.html">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M1 8h2.5l2-5 2.5 10 2-6.5 1.5 3.5H15" stroke="#C9A84C"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Insurance Daily
+  </a>
+  <span class="nav-divider">—</span>
+  <span class="nav-section">Admin</span>
+  <div class="nav-gap"></div>
+  <div class="nav-right">
+    <span id="nav-user-email"></span>
+    <button class="nav-btn" onclick="signOut()">Sign out</button>
+  </div>
+</nav>
+
+<div id="page">
+
+  <!-- ACTIVE SESSIONS -->
+  <div class="section">
+    <div class="section-title">Active Sessions</div>
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">Active (24h)</div>
+        <div class="stat-value green" id="stat-24h">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Active (7 days)</div>
+        <div class="stat-value" id="stat-7d">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value gold" id="stat-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Articles Read</div>
+        <div class="stat-value" id="stat-reads">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- USER MANAGEMENT -->
+  <div class="section">
+    <div class="section-title">User Management</div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">All Users</span>
+      </div>
+      <div id="users-wrap"><p class="tbl-loading">Loading users…</p></div>
+      <div class="inline-form">
+        <input type="email" id="invite-email" placeholder="user@example.com" />
+        <button class="btn btn-primary" onclick="inviteUser()">Send Invite</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARTICLE ANALYTICS -->
+  <div class="section">
+    <div class="section-title">Article Analytics</div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Most Read Articles</span>
+      </div>
+      <div id="reads-wrap"><p class="tbl-loading">Loading analytics…</p></div>
+    </div>
+  </div>
+
+  <!-- NEWS SOURCES -->
+  <div class="section">
+    <div class="section-title">News Sources</div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Configured Sources</span>
+        <span style="font-size:11px;color:var(--muted)">Toggle affects frontend display only — backend requires redeployment for new sources</span>
+      </div>
+      <div id="sources-wrap"><p class="tbl-loading">Loading sources…</p></div>
+      <div class="inline-form">
+        <input type="text" id="src-name" placeholder="Source name" style="max-width:200px;" />
+        <input type="url"  id="src-url"  placeholder="https://example.com/news/" />
+        <button class="btn btn-primary" onclick="addSource()">Add Source</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="flash"></div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────
+  const SUPABASE_URL      = 'https://ogpfdrpoujrekgbrfilk.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncGZkcnBvdWpyZWtnYnJmaWxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTQxODksImV4cCI6MjA4OTk3MDE4OX0.dcE_FaWQEMlYorjj0S9M5jIGCV5U2nobmc5D0RFnApM';
+  const API_BASE          = 'https://insurance-news-dashboard.onrender.com';
+  // ────────────────────────────────────────────────────────────────
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const $  = id => document.getElementById(id);
+  let currentUserId = null;
+
+  // ── AUTH ──
+  async function initAuth() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.replace('login.html'); return false; }
+
+    currentUserId = session.user.id;
+    $('nav-user-email').textContent = session.user.email;
+
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('role')
+      .eq('id', currentUserId)
+      .single();
+
+    if (!profile || profile.role !== 'admin') {
+      window.location.replace('index.html');
+      return false;
+    }
+
+    sb.auth.onAuthStateChange(ev => {
+      if (ev === 'SIGNED_OUT') window.location.replace('login.html');
+    });
+    return true;
+  }
+
+  async function signOut() {
+    await sb.auth.signOut();
+    window.location.replace('login.html');
+  }
+
+  // ── FLASH ──
+  let _ft;
+  function flash(msg, type = 'success') {
+    const el = $('flash');
+    el.textContent = msg;
+    el.className = type;
+    el.style.display = 'block';
+    clearTimeout(_ft);
+    _ft = setTimeout(() => { el.style.display = 'none'; }, 3500);
+  }
+
+  // ── UTILS ──
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }); }
+    catch(_) { return '—'; }
+  }
+  function timeAgo(ts) {
+    if (!ts) return '—';
+    try {
+      const diff = Math.floor((Date.now() - new Date(ts)) / 60000);
+      if (diff < 1)    return 'Just now';
+      if (diff < 60)   return `${diff}m ago`;
+      if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+      return `${Math.floor(diff / 1440)}d ago`;
+    } catch(_) { return '—'; }
+  }
+
+  // ── USERS ──
+  async function loadUsers() {
+    const { data: users, error } = await sb
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      $('users-wrap').innerHTML = `<p class="tbl-loading" style="color:var(--red)">Error: ${esc(error.message)}</p>`;
+      return;
+    }
+    if (!users?.length) {
+      $('users-wrap').innerHTML = `<p class="empty-state">No users found.</p>`;
+      return;
+    }
+
+    const now = Date.now();
+    $('stat-24h').textContent   = users.filter(u => u.last_seen && now - new Date(u.last_seen) < 86400000).length;
+    $('stat-7d').textContent    = users.filter(u => u.last_seen && now - new Date(u.last_seen) < 604800000).length;
+    $('stat-total').textContent = users.length;
+    $('stat-reads').textContent = users.reduce((s, u) => s + (u.articles_read || 0), 0);
+
+    $('users-wrap').innerHTML = `
+      <table class="tbl">
+        <thead><tr>
+          <th>Email</th><th>Joined</th><th>Last Active</th>
+          <th>Articles Read</th><th>Role</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${users.map(u => {
+            const isSelf     = u.id === currentUserId;
+            const isInactive = u.status === 'inactive';
+            return `<tr class="${isSelf ? 'self' : ''} ${isInactive ? 'inactive' : ''}">
+              <td>
+                ${esc(u.email)}
+                ${isSelf ? ' <span class="badge badge-admin" style="font-size:9px;padding:1px 5px">you</span>' : ''}
+              </td>
+              <td style="color:var(--muted)">${fmtDate(u.created_at)}</td>
+              <td style="color:var(--muted)">${timeAgo(u.last_seen)}</td>
+              <td>${u.articles_read || 0}</td>
+              <td><span class="badge ${u.role === 'admin' ? 'badge-admin' : 'badge-user'}">${esc(u.role)}</span></td>
+              <td><span class="badge ${isInactive ? 'badge-inactive' : 'badge-active'}">${isInactive ? 'Inactive' : 'Active'}</span></td>
+              <td>
+                ${isSelf ? '' : isInactive
+                  ? `<button class="btn btn-success" onclick="setStatus('${esc(u.id)}','active')">Restore</button>`
+                  : `<button class="btn btn-danger"  onclick="setStatus('${esc(u.id)}','inactive')">Revoke</button>`}
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  async function setStatus(userId, status) {
+    const { error } = await sb.from('profiles').update({ status }).eq('id', userId);
+    if (error) { flash(`Error: ${error.message}`, 'error'); return; }
+    flash(status === 'inactive' ? 'Access revoked.' : 'Access restored.');
+    loadUsers();
+  }
+
+  async function inviteUser() {
+    const email = $('invite-email').value.trim();
+    if (!email) { flash('Enter an email address.', 'error'); return; }
+    try {
+      const res  = await fetch(`${API_BASE}/admin/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Invite failed');
+      flash(`Invite sent to ${email}`);
+      $('invite-email').value = '';
+      setTimeout(loadUsers, 1500);
+    } catch(e) {
+      flash(`Error: ${e.message}`, 'error');
+    }
+  }
+
+  // ── ANALYTICS ──
+  async function loadAnalytics() {
+    const { data: reads, error } = await sb
+      .from('article_reads')
+      .select('article_title, article_url, category, source')
+      .order('read_at', { ascending: false })
+      .limit(500);
+
+    if (error) {
+      $('reads-wrap').innerHTML = `<p class="tbl-loading" style="color:var(--red)">Error: ${esc(error.message)}</p>`;
+      return;
+    }
+    if (!reads?.length) {
+      $('reads-wrap').innerHTML = `<p class="empty-state">No reads recorded yet. Article clicks are logged automatically from the dashboard.</p>`;
+      return;
+    }
+
+    // Aggregate
+    const byUrl = {};
+    const byCat = {};
+    for (const r of reads) {
+      const key = r.article_url || r.article_title || 'unknown';
+      if (!byUrl[key]) byUrl[key] = { title: r.article_title, url: r.article_url, source: r.source, category: r.category, n: 0 };
+      byUrl[key].n++;
+      if (r.category) byCat[r.category] = (byCat[r.category] || 0) + 1;
+    }
+
+    const top = Object.values(byUrl).sort((a, b) => b.n - a.n).slice(0, 20);
+    const topCat = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
+
+    $('reads-wrap').innerHTML = `
+      ${topCat ? `<div class="top-cat-bar">
+        Top category this period: <strong style="color:var(--gold)">${esc(topCat[0])}</strong>
+        <span style="margin-left:6px">(${topCat[1]} reads)</span>
+      </div>` : ''}
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Title</th><th>Source</th><th>Category</th><th>Reads</th></tr></thead>
+        <tbody>
+          ${top.map((r, i) => `
+            <tr>
+              <td style="color:var(--muted);width:32px">${i + 1}</td>
+              <td>
+                <a href="${esc(r.url)}" target="_blank" rel="noopener"
+                   style="color:var(--text);text-decoration:none"
+                   onmouseover="this.style.textDecoration='underline'"
+                   onmouseout="this.style.textDecoration='none'">
+                  ${esc(r.title || '—')}
+                </a>
+              </td>
+              <td style="color:var(--muted);font-size:12px">${esc(r.source || '—')}</td>
+              <td>${r.category ? `<span class="badge badge-user">${esc(r.category)}</span>` : '—'}</td>
+              <td style="font-weight:700;color:var(--gold)">${r.n}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ── SOURCES ──
+  async function loadSources() {
+    const { data: sources, error } = await sb
+      .from('sources')
+      .select('*')
+      .order('added_at', { ascending: true });
+
+    if (error) {
+      $('sources-wrap').innerHTML = `<p class="tbl-loading" style="color:var(--red)">Error: ${esc(error.message)}</p>`;
+      return;
+    }
+    if (!sources?.length) {
+      $('sources-wrap').innerHTML = `<p class="empty-state">No sources configured. Add one below.</p>`;
+      return;
+    }
+
+    $('sources-wrap').innerHTML = `
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>URL</th><th>Added</th><th>Status</th><th>Toggle</th></tr></thead>
+        <tbody>
+          ${sources.map(s => `
+            <tr>
+              <td style="font-weight:500">${esc(s.name)}</td>
+              <td>
+                <a href="${esc(s.url)}" target="_blank" rel="noopener"
+                   style="color:var(--muted);font-size:12px;text-decoration:none"
+                   onmouseover="this.style.color='var(--text)'"
+                   onmouseout="this.style.color='var(--muted)'">${esc(s.url)}</a>
+              </td>
+              <td style="color:var(--muted)">${fmtDate(s.added_at)}</td>
+              <td><span class="badge ${s.enabled ? 'badge-on' : 'badge-off'}">${s.enabled ? 'Active' : 'Disabled'}</span></td>
+              <td>
+                <button class="toggle ${s.enabled ? 'on' : ''}"
+                        onclick="toggleSource('${esc(s.id)}', ${!s.enabled})"
+                        title="${s.enabled ? 'Disable' : 'Enable'}"></button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  async function toggleSource(id, enabled) {
+    const { error } = await sb.from('sources').update({ enabled }).eq('id', id);
+    if (error) { flash(`Error: ${error.message}`, 'error'); return; }
+    flash(enabled ? 'Source enabled.' : 'Source disabled.');
+    loadSources();
+  }
+
+  async function addSource() {
+    const name = $('src-name').value.trim();
+    const url  = $('src-url').value.trim();
+    if (!name || !url) { flash('Enter both a name and a URL.', 'error'); return; }
+    const { error } = await sb.from('sources').insert({ name, url, enabled: true });
+    if (error) { flash(`Error: ${error.message}`, 'error'); return; }
+    flash(`"${name}" added. Redeploy backend to activate scraping.`);
+    $('src-name').value = '';
+    $('src-url').value  = '';
+    loadSources();
+  }
+
+  // ── INIT ──
+  initAuth().then(ok => {
+    if (!ok) return;
+    loadUsers();
+    loadAnalytics();
+    loadSources();
+  });
+</script>
+</body>
+</html>

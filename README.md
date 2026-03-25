@@ -20,6 +20,131 @@ If the key is missing or the API call fails, the backend silently falls back to 
 
 ---
 
+## 0c · Admin Page Setup
+
+### 1 · Run this SQL in Supabase SQL Editor
+
+Go to **Supabase → SQL Editor → New query**, paste and run:
+
+```sql
+-- User profiles (auto-created for every new auth user)
+create table profiles (
+  id          uuid references auth.users(id) primary key,
+  email       text,
+  role        text    default 'user',
+  status      text    default 'active',
+  created_at  timestamp default now(),
+  last_seen   timestamp,
+  last_login  timestamp,
+  articles_read integer default 0
+);
+
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, email, role)
+  values (new.id, new.email, 'user');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
+-- Article click tracking
+create table article_reads (
+  id            uuid default gen_random_uuid() primary key,
+  user_id       uuid references auth.users(id),
+  article_url   text,
+  article_title text,
+  category      text,
+  source        text,
+  read_at       timestamp default now()
+);
+
+-- Helper function to increment articles_read counter
+create or replace function increment_articles_read(uid uuid)
+returns void as $$
+  update profiles set articles_read = articles_read + 1 where id = uid;
+$$ language sql security definer;
+
+-- News sources configuration
+create table sources (
+  id        uuid default gen_random_uuid() primary key,
+  name      text not null,
+  url       text not null,
+  enabled   boolean default true,
+  added_at  timestamp default now()
+);
+
+-- Pre-populate with current sources
+insert into sources (name, url) values
+  ('Insurance Journal',   'https://www.insurancejournal.com/news/'),
+  ('Business Insurance',  'https://www.businessinsurance.com/'),
+  ('Carrier Management',  'https://www.carriermanagement.com/'),
+  ('Claims Journal',      'https://www.claimsjournal.com/'),
+  ('Insurance Business',  'https://www.insurancebusinessmag.com/');
+
+-- Row Level Security
+alter table profiles      enable row level security;
+alter table article_reads enable row level security;
+alter table sources       enable row level security;
+
+-- Profiles: users read their own row; admins read/update all
+create policy "own profile"
+  on profiles for select using (auth.uid() = id);
+
+create policy "admin read all profiles"
+  on profiles for select
+  using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+create policy "admin update profiles"
+  on profiles for update
+  using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+create policy "own update last_seen"
+  on profiles for update using (auth.uid() = id);
+
+-- Article reads: users insert their own; admins read all
+create policy "insert own reads"
+  on article_reads for insert with check (auth.uid() = user_id);
+
+create policy "admin read all reads"
+  on article_reads for select
+  using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+
+-- Sources: authenticated users read; admins manage
+create policy "authenticated read sources"
+  on sources for select using (auth.role() = 'authenticated');
+
+create policy "admin manage sources"
+  on sources for all
+  using (exists (select 1 from profiles where id = auth.uid() and role = 'admin'));
+```
+
+### 2 · Make yourself admin
+
+```sql
+update profiles set role = 'admin'
+where email = 'YOUR_EMAIL_HERE';
+```
+
+Replace `YOUR_EMAIL_HERE` with your actual email (e.g. `josh@crook.uk`).
+
+### 3 · Add Render environment variables for invite functionality
+
+In Render → your service → **Environment**, add:
+
+| Key | Value |
+|---|---|
+| `SUPABASE_URL` | `https://ogpfdrpoujrekgbrfilk.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Your service role key from Supabase → Settings → API → **service_role** |
+
+The service role key is **never exposed to the frontend** — it lives only on Render.
+
+---
+
 ## 0b · Supabase Auth Setup (invite-only magic link)
 
 ### Create a free Supabase project

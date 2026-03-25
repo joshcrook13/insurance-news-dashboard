@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -548,3 +549,29 @@ def categorise(body: dict):
 @app.get("/health")
 async def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat() + "Z"}
+
+
+class InviteRequest(BaseModel):
+    email: str
+
+
+@app.post("/admin/invite")
+async def admin_invite(req: InviteRequest):
+    service_role_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    supabase_url     = os.environ.get("SUPABASE_URL")
+    if not service_role_key or not supabase_url:
+        raise HTTPException(status_code=503, detail="SUPABASE_SERVICE_ROLE_KEY or SUPABASE_URL not configured on server")
+    resp = requests.post(
+        f"{supabase_url}/auth/v1/admin/users",
+        headers={
+            "Authorization": f"Bearer {service_role_key}",
+            "apikey": service_role_key,
+            "Content-Type": "application/json",
+        },
+        json={"email": req.email, "invite": True},
+        timeout=15,
+    )
+    if not resp.ok:
+        detail = resp.json().get("msg") or resp.json().get("message") or resp.text
+        raise HTTPException(status_code=resp.status_code, detail=detail)
+    return {"ok": True, "email": req.email}

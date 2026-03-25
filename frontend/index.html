@@ -809,8 +809,21 @@
       window.location.replace('login.html');
       return false;
     }
+    // Check profile status (revoked users are blocked)
+    const { data: profile } = await sb
+      .from('profiles')
+      .select('status')
+      .eq('id', session.user.id)
+      .single();
+    if (profile && profile.status === 'inactive') {
+      await sb.auth.signOut();
+      window.location.replace('login.html');
+      return false;
+    }
     // Show user email in nav
     $("nav-user-email").textContent = session.user.email;
+    // Update last_seen (fire and forget)
+    sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', session.user.id).then(() => {});
     // Listen for session expiry
     sb.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') window.location.replace('login.html');
@@ -1081,7 +1094,11 @@
 
     // Update sidebar counts using AI categories
     const articleCatMap = {};
-    results.forEach(({ id, categories }) => { articleCatMap[id] = categories || []; });
+    results.forEach(({ id, categories }) => {
+      articleCatMap[id] = categories || [];
+      // Cache categories by URL for read tracking
+      if (articles[id]?.url) articleCategoryCache[articles[id].url] = categories || [];
+    });
     rebuildSidebarWithAiCats(articles, articleCatMap);
   }
 
@@ -1148,6 +1165,35 @@
       if (msg) msg.style.display = "none";
     }
   }
+
+  // ── ARTICLE READ TRACKING ──
+  // articleCategoryCache: populated by categoriseArticles, maps url → [categories]
+  const articleCategoryCache = {};
+
+  async function logRead(url, title, source) {
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return;
+      const category = (articleCategoryCache[url] || [])[0] || null;
+      await sb.from('article_reads').insert({
+        user_id:       session.user.id,
+        article_url:   url,
+        article_title: title,
+        source:        source,
+        category:      category,
+      });
+      // Increment articles_read counter
+      await sb.rpc('increment_articles_read', { uid: session.user.id }).catch(() => {});
+    } catch(_) {}
+  }
+
+  // Delegated click listener — intercepts all article link clicks
+  document.addEventListener('click', e => {
+    const link = e.target.closest('a[href]');
+    if (!link || !link.href.startsWith('http')) return;
+    const article = allArticles.find(a => a.url === link.href);
+    if (article) logRead(article.url, article.title, article.source);
+  });
 
   setNavDate();
   initAuth().then(ok => { if (ok) loadNews(); });
