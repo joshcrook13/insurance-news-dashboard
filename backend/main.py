@@ -78,11 +78,30 @@ def parse_date(date_str: str):
     return None
 
 
-def recency_bonus(date_str: str) -> float:
-    """Return up to +4.0 for today's articles, decaying over 7 days."""
-    dt = parse_date(date_str)
+def extract_date_from_url(url: str):
+    """Extract date from URL patterns like /2026/03/25/ common on IJ/CM/CJ."""
+    m = re.search(r"/(\d{4})/(\d{2})/(\d{2})/", url or "")
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except Exception:
+            pass
+    return None
+
+
+def best_date(article: dict):
+    """Return the best available datetime for an article."""
+    dt = parse_date(article.get("date", ""))
+    if dt:
+        return dt
+    return extract_date_from_url(article.get("url", ""))
+
+
+def recency_bonus(article: dict) -> float:
+    """Return up to +4.0 for today's articles, decaying over 7 days. -1.0 if no date at all."""
+    dt = best_date(article)
     if not dt:
-        return 0.5  # unknown date — small neutral bonus
+        return -1.0  # penalise articles with no date signal
     age_days = (datetime.utcnow() - dt).total_seconds() / 86400
     if age_days < 0:
         age_days = 0
@@ -438,8 +457,7 @@ def score_and_rank(all_articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             reasons.append(f"{max_comments_in_group} comments")
 
         # Recency bonus — today's articles score up to +4.0, decays over 7 days
-        best_date = max((a["date"] for a in group if a.get("date")), key=lambda d: parse_date(d) or datetime.min, default="")
-        score += recency_bonus(best_date)
+        score += recency_bonus(best)
 
         # Page-position prominence bonus (earlier = more prominent)
         positions = [idx for idx, a in enumerate(all_articles) if a in group]
@@ -449,11 +467,18 @@ def score_and_rank(all_articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not reasons:
             reasons.append("Latest news")
 
+        # Use URL-derived date if no text date
+        display_date = best["date"]
+        if not display_date:
+            dt = extract_date_from_url(best["url"])
+            if dt:
+                display_date = dt.strftime("%b %d, %Y")
+
         scored.append({
             "title": best["title"],
             "source": " & ".join(sources[:2]) if len(sources) > 1 else sources[0],
             "sources": sources,
-            "date": best["date"],
+            "date": display_date,
             "summary": best["summary"],
             "url": best["url"],
             "relevance_score": round(score, 1),
@@ -500,11 +525,11 @@ async def get_news():
 
     all_articles = ij + bi + cm + cj + ibm
 
-    # Drop articles older than 14 days (keeps only fresh content)
+    # Drop articles older than 14 days (uses URL date if no text date available)
     def is_fresh(a):
-        dt = parse_date(a.get("date", ""))
+        dt = best_date(a)
         if dt is None:
-            return True  # no date = keep it, benefit of the doubt
+            return True  # truly no date signal — keep but will be penalised in scoring
         return (datetime.utcnow() - dt).days <= 14
 
     all_articles = [a for a in all_articles if is_fresh(a)]
