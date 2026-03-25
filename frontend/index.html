@@ -6,22 +6,25 @@
   <title>Insurance Daily</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:       #0A0F1E;
-      --bg-nav:   #060B18;
-      --bg-card:  #111827;
-      --bg-hover: #162032;
-      --bg-angle: #0D1525;
-      --border:   #1E2A3A;
-      --gold:     #C9A84C;
-      --text:     #F0F4F8;
-      --muted:    #8899AA;
-      --green:    #10B981;
+      --bg:         #0B1120;
+      --bg-nav:     #070D1A;
+      --bg-card:    #111928;
+      --bg-hover:   #151E30;
+      --border:     #1C2840;
+      --border-mid: #243350;
+      --gold:       #C4963C;
+      --gold-dim:   rgba(196,150,60,0.18);
+      --gold-line:  rgba(196,150,60,0.35);
+      --text:       #EDF1F7;
+      --text-2:     #9AAABB;
+      --text-3:     #5C7080;
+      --green:      #2DD4A0;
     }
 
     html, body {
@@ -32,43 +35,66 @@
       background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
-    /* ── NAV (52px fixed) ── */
+    /* ════════════════════════════════════════
+       NAV  —  48px
+    ════════════════════════════════════════ */
     #nav {
       position: fixed;
       top: 0; left: 0; right: 0;
-      height: 52px;
+      height: 48px;
       background: var(--bg-nav);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      padding: 0 20px;
-      gap: 10px;
+      padding: 0 24px;
+      gap: 12px;
       z-index: 200;
     }
 
     .nav-logo {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      letter-spacing: -0.2px;
-      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       flex-shrink: 0;
     }
 
-    .nav-pipe {
+    .nav-logo-mark {
+      width: 22px;
+      height: 22px;
+      background: var(--gold);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #07080C;
+      letter-spacing: -0.5px;
+      flex-shrink: 0;
+    }
+
+    .nav-logo-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .nav-divider {
       width: 1px;
-      height: 14px;
-      background: var(--border);
+      height: 16px;
+      background: var(--border-mid);
       flex-shrink: 0;
     }
 
     #nav-date {
       font-size: 12px;
-      color: var(--muted);
+      color: var(--text-3);
       white-space: nowrap;
-      flex-shrink: 0;
     }
 
     .nav-gap { flex: 1; }
@@ -76,278 +102,253 @@
     .nav-right {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
+      gap: 8px;
     }
 
     #nav-user-email {
-      font-size: 11px;
-      color: var(--muted);
+      font-size: 12px;
+      color: var(--text-3);
+      margin-right: 4px;
     }
 
     .live-indicator {
       display: flex;
       align-items: center;
       gap: 5px;
+      margin-right: 4px;
     }
 
     .live-dot {
-      width: 7px;
-      height: 7px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: var(--green);
-      animation: pulse-dot 2s ease-in-out infinite;
-      flex-shrink: 0;
+      animation: pulse-dot 2.5s ease-in-out infinite;
     }
 
     @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.6; transform: scale(0.85); }
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
     }
 
     .live-text {
       font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
       color: var(--green);
     }
 
-    #admin-btn {
-      padding: 5px 11px;
-      border: 1px solid var(--gold);
-      border-radius: 4px;
-      background: transparent;
-      color: var(--gold);
+    .nav-btn {
+      padding: 5px 12px;
+      border-radius: 5px;
       font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    #admin-btn {
+      border: 1px solid var(--gold-line);
+      background: var(--gold-dim);
+      color: var(--gold);
       text-decoration: none;
-      transition: background 0.15s;
       display: none;
     }
-    #admin-btn:hover { background: rgba(201,168,76,0.1); }
+    #admin-btn:hover { background: rgba(196,150,60,0.28); }
 
     #refresh-btn {
       display: flex;
       align-items: center;
       gap: 5px;
-      padding: 5px 11px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
+      border: 1px solid var(--border-mid);
       background: transparent;
-      color: var(--muted);
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: border-color 0.15s, color 0.15s;
+      color: var(--text-2);
     }
-    #refresh-btn:hover { border-color: var(--gold); color: var(--gold); }
-    #refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #refresh-btn:hover { border-color: var(--gold-line); color: var(--gold); }
+    #refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     #signout-btn {
-      background: none;
       border: none;
-      color: var(--muted);
-      font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      cursor: pointer;
-      transition: color 0.15s;
+      background: none;
+      color: var(--text-3);
     }
-    #signout-btn:hover { color: var(--text); }
+    #signout-btn:hover { color: var(--text-2); }
 
-    .spin { animation: rotate 0.8s linear infinite; }
+    .spin { animation: rotate 0.75s linear infinite; }
     @keyframes rotate { to { transform: rotate(360deg); } }
 
-    /* ── CONTENT AREA (between nav and footer) ── */
+    /* ════════════════════════════════════════
+       LAYOUT
+    ════════════════════════════════════════ */
     #content-area {
       position: fixed;
-      top: 52px;
-      bottom: 36px;
+      top: 48px;
+      bottom: 32px;
       left: 0;
       right: 0;
       display: flex;
     }
 
-    /* ── SIDEBAR (160px) ── */
+    /* ════════════════════════════════════════
+       SIDEBAR  —  180px
+    ════════════════════════════════════════ */
     #sidebar {
-      width: 160px;
+      width: 180px;
       flex-shrink: 0;
-      background: var(--bg);
       border-right: 1px solid var(--border);
       overflow-y: auto;
-      padding: 16px 0;
+      padding: 20px 0;
       scrollbar-width: none;
     }
     #sidebar::-webkit-scrollbar { display: none; }
 
-    .sb-section { padding: 0; }
-
     .sb-label {
       font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--gold);
-      padding: 0 14px 8px;
+      color: var(--text-3);
+      padding: 0 16px 10px;
       display: block;
     }
 
     .sb-divider {
       height: 1px;
       background: var(--border);
-      margin: 12px 14px;
+      margin: 16px 0;
     }
 
-    /* Topic pills */
-    .topic-pill {
+    .sb-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 14px;
+      padding: 7px 16px;
       cursor: pointer;
       border-left: 2px solid transparent;
-      transition: background 0.12s, border-color 0.12s;
-      gap: 6px;
+      transition: background 0.1s, border-color 0.1s;
+      gap: 8px;
       user-select: none;
     }
-    .topic-pill:hover { background: var(--bg-hover); }
-    .topic-pill.active { border-left-color: var(--gold); background: var(--bg-hover); }
-    .topic-pill.active .tp-name { color: var(--text); font-weight: 500; }
-
-    .tp-name {
-      font-size: 11px;
-      color: var(--muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex: 1;
-      min-width: 0;
+    .sb-row:hover { background: var(--bg-hover); }
+    .sb-row.active {
+      border-left-color: var(--gold);
+      background: var(--bg-hover);
     }
+    .sb-row.active .sb-row-name { color: var(--text); }
+    .sb-row.dim { opacity: 0.3; pointer-events: none; }
 
-    .tp-count {
-      font-size: 10px;
-      font-weight: 600;
-      padding: 1px 5px;
-      border-radius: 8px;
-      background: var(--border);
-      color: var(--muted);
-      flex-shrink: 0;
-      min-width: 18px;
-      text-align: center;
-    }
-    .topic-pill.active .tp-count {
-      background: rgba(201,168,76,0.15);
-      color: var(--gold);
-    }
-
-    /* Source rows */
-    .source-row {
+    .sb-row-left {
       display: flex;
       align-items: center;
-      padding: 5px 14px;
       gap: 7px;
-      cursor: pointer;
-      border-left: 2px solid transparent;
-      transition: background 0.12s;
-      user-select: none;
+      min-width: 0;
+      flex: 1;
     }
-    .source-row:hover { background: var(--bg-hover); }
-    .source-row.active { border-left-color: var(--gold); background: var(--bg-hover); }
-    .source-row.active .src-name { color: var(--text); }
-    .source-row.dim { opacity: 0.4; pointer-events: none; }
 
     .src-dot {
-      width: 7px;
-      height: 7px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       flex-shrink: 0;
     }
 
-    .src-name {
-      font-size: 11px;
-      color: var(--muted);
+    .sb-row-name {
+      font-size: 12px;
+      color: var(--text-2);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      flex: 1;
-      min-width: 0;
     }
 
-    .src-count {
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--muted);
+    .sb-row-count {
+      font-size: 11px;
+      color: var(--text-3);
       flex-shrink: 0;
     }
+    .sb-row.active .sb-row-count { color: var(--gold); }
 
-    /* ── MAIN (flex: 1, scrollable) ── */
+    /* ════════════════════════════════════════
+       MAIN
+    ════════════════════════════════════════ */
     #main {
       flex: 1;
       min-width: 0;
       overflow-y: auto;
-      padding: 24px 28px 40px;
+      padding: 32px 40px 48px;
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
-    #main::-webkit-scrollbar { width: 5px; }
+    #main::-webkit-scrollbar { width: 4px; }
     #main::-webkit-scrollbar-track { background: transparent; }
-    #main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #main::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
-    /* ── FOOTER (36px fixed) ── */
+    .content-wrap {
+      max-width: 760px;
+    }
+
+    /* ════════════════════════════════════════
+       FOOTER  —  32px
+    ════════════════════════════════════════ */
     #footer {
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      height: 36px;
+      height: 32px;
       background: var(--bg-nav);
       border-top: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
-      font-size: 10px;
-      color: var(--muted);
+      padding: 0 24px;
+      font-size: 11px;
+      color: var(--text-3);
     }
 
-    /* ── MARKET PULSE CARD ── */
+    /* ════════════════════════════════════════
+       MARKET PULSE
+    ════════════════════════════════════════ */
     #market-pulse {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--gold);
-      border-radius: 8px;
-      padding: 18px 22px;
-      margin-bottom: 24px;
+      padding: 0 0 28px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .pulse-label {
+    .pulse-eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .pulse-eyebrow-text {
       font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--gold);
-      margin-bottom: 10px;
+    }
+
+    .pulse-eyebrow-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
     }
 
     #pulse-text {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 17px;
+      font-size: 19px;
       font-weight: 400;
       color: var(--text);
-      line-height: 1.6;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
+      line-height: 1.65;
+      margin-bottom: 16px;
     }
 
     .pulse-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-top: 14px;
-      gap: 12px;
+      gap: 16px;
       flex-wrap: wrap;
     }
 
@@ -361,289 +362,271 @@
       font-size: 11px;
       font-weight: 500;
       padding: 3px 10px;
-      border: 1px solid rgba(201,168,76,0.4);
-      border-radius: 12px;
-      color: rgba(201,168,76,0.8);
-      cursor: default;
+      border: 1px solid var(--border-mid);
+      border-radius: 100px;
+      color: var(--text-2);
       user-select: none;
     }
 
     .pulse-meta {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
+      gap: 12px;
     }
 
     .ai-badge {
-      font-size: 10px;
-      color: #4B5E6F;
+      font-size: 11px;
+      color: var(--text-3);
     }
 
     #last-updated {
       font-size: 11px;
-      color: var(--muted);
+      color: var(--text-3);
     }
 
-    /* ── SECTION LABEL ── */
-    .section-label {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 12px;
+    /* ════════════════════════════════════════
+       SECTION HEADER
+    ════════════════════════════════════════ */
+    .section-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-    }
-    .section-label::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+      justify-content: space-between;
+      margin-bottom: 16px;
     }
 
-    /* ── ARTICLE CARDS ── */
+    .section-title {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    /* ════════════════════════════════════════
+       ARTICLE CARDS
+    ════════════════════════════════════════ */
     .article-card {
       display: block;
       text-decoration: none;
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--topic-color, var(--gold));
       border-radius: 8px;
-      padding: 16px 20px;
-      margin-bottom: 10px;
+      padding: 20px 24px;
+      margin-bottom: 8px;
       cursor: pointer;
-      transition: background 0.15s, box-shadow 0.15s;
+      transition: background 0.15s, border-color 0.15s;
       opacity: 0;
-      animation: fadeInUp 0.3s ease forwards;
-    }
-    .article-card:hover {
-      background: var(--bg-hover);
-      box-shadow: 0 0 0 1px rgba(201,168,76,0.15);
+      animation: fadeIn 0.25s ease forwards;
+      position: relative;
     }
 
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(8px); }
+    .article-card:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-mid);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    .card-top-row {
+    .card-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 9px;
-      gap: 10px;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+
+    .card-top-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-rank {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-3);
+      font-variant-numeric: tabular-nums;
+      min-width: 20px;
     }
 
     .topic-badge {
       font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
       padding: 2px 8px;
-      border-radius: 10px;
-      flex-shrink: 0;
+      border-radius: 4px;
     }
 
-    .card-meta {
+    .card-top-right {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       flex-shrink: 0;
     }
 
     .card-source {
-      font-size: 11px;
-      color: var(--muted);
+      font-size: 12px;
+      color: var(--text-3);
     }
 
-    .card-sep {
-      font-size: 11px;
-      color: #3A4A5A;
+    .card-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--text-3);
+      flex-shrink: 0;
     }
 
     .card-time {
-      font-size: 11px;
-      color: var(--muted);
+      font-size: 12px;
+      color: var(--text-3);
     }
 
     .card-headline {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 16px;
-      font-weight: 500;
+      font-size: 17px;
+      font-weight: 400;
       color: var(--text);
-      line-height: 1.35;
+      line-height: 1.4;
+      margin-bottom: 8px;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
-      margin-bottom: 7px;
     }
 
     .card-summary {
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.5;
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.55;
+      margin-bottom: 12px;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
-      margin-bottom: 9px;
     }
 
-    /* Consultant angle */
+    /* Consultant angle — blockquote style */
     .consultant-angle {
-      background: var(--bg-angle);
-      border-radius: 4px;
-      padding: 8px 12px;
-      margin-bottom: 10px;
+      border-left: 2px solid var(--gold-line);
+      padding: 2px 0 2px 14px;
+      margin-bottom: 0;
     }
 
     .angle-label {
-      font-size: 9px;
+      font-size: 10px;
       font-weight: 600;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--gold);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .angle-text {
-      font-size: 12px;
-      color: #B8C4D0;
-      line-height: 1.5;
+      font-size: 13px;
+      color: var(--text-2);
+      line-height: 1.55;
+      font-style: italic;
     }
 
-    /* Bottom row */
-    .card-bottom-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 2px;
-    }
-
-    .sig-dots {
-      display: flex;
-      gap: 3px;
-      align-items: center;
-    }
-
-    .sig-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--border);
-      transition: background 0.2s;
-    }
-    .sig-dot.filled { background: var(--gold); }
-
-    .read-link {
-      font-size: 11px;
-      color: var(--gold);
-      font-weight: 500;
-    }
-
-    /* ── SKELETON LOADING ── */
+    /* ════════════════════════════════════════
+       SKELETON LOADING
+    ════════════════════════════════════════ */
     @keyframes shimmer {
-      0%   { background-position: -400px 0; }
-      100% { background-position: 400px 0; }
+      0%   { background-position: -600px 0; }
+      100% { background-position: 600px 0; }
     }
 
     .skel {
-      background: linear-gradient(90deg, #1E2A3A 25%, #243347 50%, #1E2A3A 75%);
-      background-size: 400px 100%;
-      animation: shimmer 1.4s ease-in-out infinite;
+      background: linear-gradient(90deg, var(--border) 25%, var(--border-mid) 50%, var(--border) 75%);
+      background-size: 600px 100%;
+      animation: shimmer 1.6s ease-in-out infinite;
       border-radius: 4px;
     }
 
     .skeleton-pulse {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
-      border-radius: 8px;
-      padding: 18px 22px;
-      margin-bottom: 24px;
+      padding: 0 0 28px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--border);
     }
 
     .skeleton-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-left: 3px solid var(--border);
       border-radius: 8px;
-      padding: 16px 20px;
-      margin-bottom: 10px;
+      padding: 20px 24px;
+      margin-bottom: 8px;
     }
 
-    .skel-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-    .skel-badge { width: 90px; height: 18px; }
-    .skel-meta  { width: 120px; height: 14px; }
-    .skel-title  { height: 20px; margin-bottom: 6px; }
-    .skel-title.s2 { width: 70%; }
-    .skel-text  { height: 14px; margin-bottom: 4px; }
-    .skel-text.s2 { width: 80%; margin-bottom: 10px; }
-    .skel-angle { height: 48px; }
+    .skel-row { display: flex; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+    .skel-badge { height: 18px; width: 80px; }
+    .skel-meta  { height: 14px; width: 110px; }
+    .skel-h1    { height: 22px; width: 100%; margin-bottom: 6px; }
+    .skel-h2    { height: 22px; width: 68%; margin-bottom: 10px; }
+    .skel-p1    { height: 14px; width: 100%; margin-bottom: 5px; }
+    .skel-p2    { height: 14px; width: 80%; margin-bottom: 12px; }
+    .skel-angle { height: 44px; width: 100%; }
 
-    /* ── ERROR STATE ── */
+    /* ════════════════════════════════════════
+       STATES
+    ════════════════════════════════════════ */
     #state-error {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 300px;
-      gap: 14px;
+      min-height: 320px;
+      gap: 12px;
       text-align: center;
+      max-width: 760px;
     }
 
-    .error-icon { font-size: 32px; }
-    .error-msg  { font-size: 14px; color: var(--muted); }
+    .error-msg { font-size: 14px; color: var(--text-2); }
 
     .retry-btn {
-      padding: 8px 18px;
-      border: 1px solid var(--gold);
-      border-radius: 4px;
+      padding: 8px 20px;
+      border: 1px solid var(--gold-line);
+      border-radius: 5px;
       background: transparent;
       color: var(--gold);
       font-family: 'Inter', sans-serif;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       transition: background 0.15s;
     }
-    .retry-btn:hover { background: rgba(201,168,76,0.1); }
+    .retry-btn:hover { background: var(--gold-dim); }
 
-    /* ── FALLBACK BANNER ── */
     #fallback-banner {
-      background: rgba(201,168,76,0.06);
-      border: 1px solid rgba(201,168,76,0.2);
+      border: 1px solid var(--border-mid);
       border-radius: 6px;
-      padding: 9px 14px;
-      font-size: 12px;
-      color: rgba(201,168,76,0.8);
-      margin-bottom: 16px;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: var(--text-2);
+      margin-bottom: 20px;
     }
 
-    /* ── WAKE MESSAGE ── */
     #wake-msg {
       text-align: center;
-      padding: 20px;
+      padding: 24px;
       font-size: 13px;
-      color: var(--muted);
+      color: var(--text-3);
     }
 
-    /* ── NO RESULTS ── */
     .no-results {
       text-align: center;
-      padding: 40px 20px;
-      font-size: 13px;
-      color: var(--muted);
+      padding: 48px 24px;
+      font-size: 14px;
+      color: var(--text-3);
     }
 
-    /* ── RESPONSIVE ── */
     @media (max-width: 768px) {
       #sidebar { display: none; }
-      #main { padding: 16px; }
+      #main    { padding: 20px; }
     }
   </style>
 </head>
@@ -651,8 +634,11 @@
 
   <!-- NAV -->
   <nav id="nav">
-    <span class="nav-logo">⚡ Insurance Daily</span>
-    <span class="nav-pipe"></span>
+    <div class="nav-logo">
+      <div class="nav-logo-mark">ID</div>
+      <span class="nav-logo-text">Insurance Daily</span>
+    </div>
+    <div class="nav-divider"></div>
     <span id="nav-date"></span>
     <div class="nav-gap"></div>
     <div class="nav-right">
@@ -661,15 +647,15 @@
         <span class="live-dot"></span>
         <span class="live-text">LIVE</span>
       </span>
-      <a id="admin-btn" href="admin.html">Admin</a>
-      <button id="refresh-btn" onclick="loadNews()">
-        <svg id="refresh-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M10.5 6a4.5 4.5 0 1 1-1.06-2.9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M10.5 2v2.5H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      <a id="admin-btn" href="admin.html" class="nav-btn">Admin</a>
+      <button id="refresh-btn" class="nav-btn" onclick="loadNews()">
+        <svg id="refresh-icon" width="11" height="11" viewBox="0 0 12 12" fill="none">
+          <path d="M10.5 6a4.5 4.5 0 1 1-1.06-2.9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M10.5 2v2.5H8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         Refresh
       </button>
-      <button id="signout-btn" onclick="signOut()">Sign out</button>
+      <button id="signout-btn" class="nav-btn" onclick="signOut()">Sign out</button>
     </div>
   </nav>
 
@@ -678,84 +664,84 @@
 
     <!-- SIDEBAR -->
     <aside id="sidebar">
-      <div class="sb-section">
-        <span class="sb-label">Topics</span>
-        <div id="topic-filters"></div>
-      </div>
+      <span class="sb-label">Topics</span>
+      <div id="topic-filters"></div>
+
       <div class="sb-divider"></div>
-      <div class="sb-section">
-        <span class="sb-label">Sources</span>
-        <div id="source-list"></div>
-      </div>
+
+      <span class="sb-label">Sources</span>
+      <div id="source-list"></div>
     </aside>
 
     <!-- MAIN -->
     <main id="main">
+      <div class="content-wrap">
 
-      <!-- Loading state -->
-      <div id="state-loading">
-        <div id="wake-msg" style="display:none">Waking up the server, this takes ~30 seconds…</div>
-        <!-- Skeleton market pulse -->
-        <div class="skeleton-pulse">
-          <div class="skel" style="width:140px;height:12px;margin-bottom:12px"></div>
-          <div class="skel skel-title" style="width:100%"></div>
-          <div class="skel skel-title s2" style="margin-bottom:4px"></div>
-          <div class="skel skel-title" style="width:55%"></div>
-        </div>
-        <div class="section-label" style="opacity:0.3">TODAY'S BRIEFING</div>
-        <!-- Skeleton cards -->
-        <div class="skeleton-card">
-          <div class="skel-row"><div class="skel skel-badge"></div><div class="skel skel-meta"></div></div>
-          <div class="skel skel-title"></div><div class="skel skel-title s2"></div>
-          <div class="skel skel-text"></div><div class="skel skel-text s2"></div>
-          <div class="skel skel-angle"></div>
-        </div>
-        <div class="skeleton-card">
-          <div class="skel-row"><div class="skel skel-badge"></div><div class="skel skel-meta"></div></div>
-          <div class="skel skel-title"></div><div class="skel skel-title s2"></div>
-          <div class="skel skel-text"></div><div class="skel skel-text s2"></div>
-          <div class="skel skel-angle"></div>
-        </div>
-        <div class="skeleton-card">
-          <div class="skel-row"><div class="skel skel-badge"></div><div class="skel skel-meta"></div></div>
-          <div class="skel skel-title"></div><div class="skel skel-title s2"></div>
-          <div class="skel skel-text"></div><div class="skel skel-text s2"></div>
-          <div class="skel skel-angle"></div>
-        </div>
-      </div>
-
-      <!-- Error state -->
-      <div id="state-error" style="display:none">
-        <div class="error-icon">⚠</div>
-        <p class="error-msg">Unable to load briefing. Please try again.</p>
-        <button class="retry-btn" onclick="loadNews()">Retry</button>
-      </div>
-
-      <!-- Content state -->
-      <div id="state-content" style="display:none">
-
-        <!-- Fallback banner -->
-        <div id="fallback-banner" style="display:none">
-          Live AI analysis unavailable — showing latest headlines
-        </div>
-
-        <!-- Market Pulse -->
-        <div id="market-pulse">
-          <div class="pulse-label">Market Pulse · Today</div>
-          <p id="pulse-text"></p>
-          <div class="pulse-footer">
-            <div id="trending-pills"></div>
-            <div class="pulse-meta">
-              <span class="ai-badge">Powered by Claude AI</span>
-              <span id="last-updated"></span>
-            </div>
+        <!-- Loading -->
+        <div id="state-loading">
+          <div id="wake-msg" style="display:none">Waking up the server — this takes about 30 seconds…</div>
+          <div class="skeleton-pulse">
+            <div class="skel" style="width:120px;height:11px;margin-bottom:14px"></div>
+            <div class="skel skel-h1"></div>
+            <div class="skel skel-h2"></div>
+            <div class="skel" style="width:45%;height:22px"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skel-row"><div class="skel skel-badge"></div><div class="skel skel-meta"></div></div>
+            <div class="skel skel-h1"></div><div class="skel skel-h2"></div>
+            <div class="skel skel-p1"></div><div class="skel skel-p2"></div>
+            <div class="skel skel-angle"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skel-row"><div class="skel skel-badge"></div><div class="skel skel-meta"></div></div>
+            <div class="skel skel-h1"></div><div class="skel skel-h2"></div>
+            <div class="skel skel-p1"></div><div class="skel skel-p2"></div>
+            <div class="skel skel-angle"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skel-row"><div class="skel skel-badge"></div><div class="skel skel-meta"></div></div>
+            <div class="skel skel-h1"></div><div class="skel skel-h2"></div>
+            <div class="skel skel-p1"></div><div class="skel skel-p2"></div>
+            <div class="skel skel-angle"></div>
           </div>
         </div>
 
-        <!-- Briefing -->
-        <div class="section-label">Today's Briefing</div>
-        <div id="articles-list"></div>
+        <!-- Error -->
+        <div id="state-error" style="display:none">
+          <p class="error-msg">Unable to load briefing. Please try again.</p>
+          <button class="retry-btn" onclick="loadNews()">Retry</button>
+        </div>
 
+        <!-- Content -->
+        <div id="state-content" style="display:none">
+
+          <div id="fallback-banner" style="display:none">
+            AI analysis unavailable — showing latest headlines
+          </div>
+
+          <!-- Market Pulse -->
+          <div id="market-pulse">
+            <div class="pulse-eyebrow">
+              <span class="pulse-eyebrow-text">Market Pulse</span>
+              <span class="pulse-eyebrow-line"></span>
+            </div>
+            <p id="pulse-text"></p>
+            <div class="pulse-footer">
+              <div id="trending-pills"></div>
+              <div class="pulse-meta">
+                <span class="ai-badge">Powered by Claude AI</span>
+                <span id="last-updated"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Briefing -->
+          <div class="section-header">
+            <span class="section-title">Today's Briefing</span>
+          </div>
+          <div id="articles-list"></div>
+
+        </div>
       </div>
     </main>
   </div>
@@ -779,26 +765,16 @@
   // ── AUTH ─────────────────────────────────────────────────────────────
   async function initAuth() {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) {
-      window.location.replace('login.html');
-      return false;
-    }
+    if (!session) { window.location.replace('login.html'); return false; }
     const { data: profile } = await sb
-      .from('profiles')
-      .select('status, role')
-      .eq('id', session.user.id)
-      .single();
+      .from('profiles').select('status, role').eq('id', session.user.id).single();
     if (profile && profile.status === 'inactive') {
-      await sb.auth.signOut();
-      window.location.replace('login.html');
-      return false;
+      await sb.auth.signOut(); window.location.replace('login.html'); return false;
     }
     $("nav-user-email").textContent = session.user.email;
     if (profile && profile.role === 'admin') $("admin-btn").style.display = "";
     sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', session.user.id).then(() => {});
-    sb.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') window.location.replace('login.html');
-    });
+    sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') window.location.replace('login.html'); });
     return true;
   }
 
@@ -809,33 +785,30 @@
 
   // ── TOPIC COLORS ──────────────────────────────────────────────────────
   const TOPIC_COLORS = {
-    'Property & Casualty': '#1D4ED8',
-    'Reinsurance':         '#7C3AED',
+    'Property & Casualty': '#3B82F6',
+    'Reinsurance':         '#8B5CF6',
     'Cyber':               '#EF4444',
     'Climate & CAT':       '#10B981',
     'Regulatory':          '#F59E0B',
     'Life & Health':       '#EC4899',
-    'Markets':             '#0891B2',
-    'M&A':                 '#8B5CF6',
+    'Markets':             '#06B6D4',
+    'M&A':                 '#A78BFA',
   };
 
-  function topicColor(topic) {
-    return TOPIC_COLORS[topic] || '#C9A84C';
-  }
+  function topicColor(t) { return TOPIC_COLORS[t] || '#C4963C'; }
 
-  // ── SOURCE COLORS ─────────────────────────────────────────────────────
   function srcColor(source) {
     const s = (source || '').toLowerCase();
-    if (s.includes('insurance journal'))  return '#1D4ED8';
-    if (s.includes('claims journal'))     return '#059669';
-    if (s.includes('carrier management')) return '#0891B2';
-    if (s.includes('reinsurance news'))   return '#7C3AED';
+    if (s.includes('insurance journal'))  return '#3B82F6';
+    if (s.includes('claims journal'))     return '#10B981';
+    if (s.includes('carrier management')) return '#06B6D4';
+    if (s.includes('reinsurance news'))   return '#8B5CF6';
     if (s.includes('artemis'))            return '#EF4444';
     if (s.includes('coverager'))          return '#F59E0B';
-    return '#C9A84C';
+    return '#C4963C';
   }
 
-  // ── DATE HELPERS ──────────────────────────────────────────────────────
+  // ── DATE ──────────────────────────────────────────────────────────────
   function setNavDate() {
     const d = new Date();
     const days   = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -846,132 +819,92 @@
   function timeAgo(raw) {
     if (!raw) return '';
     try {
-      const d    = new Date(raw);
-      if (isNaN(d)) return '';
-      const diff = Math.floor((Date.now() - d) / 60000);
+      const diff = Math.floor((Date.now() - new Date(raw)) / 60000);
       if (diff < 1)    return 'Just now';
       if (diff < 60)   return `${diff}m ago`;
-      if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-      return `${Math.floor(diff / 1440)}d ago`;
+      if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+      return `${Math.floor(diff/1440)}d ago`;
     } catch (_) { return ''; }
   }
 
   function formatFetchedAt(iso) {
     if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      return `Updated ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    } catch (_) { return ''; }
+    try { return `Updated ${new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`; }
+    catch (_) { return ''; }
   }
 
   function esc(s) {
-    return String(s ?? '')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── SIGNIFICANCE DOTS ─────────────────────────────────────────────────
-  function significanceDots(score) {
-    const filled = Math.round(Math.max(0, Math.min(10, score || 5)));
-    let html = '';
-    for (let i = 0; i < 10; i++) {
-      html += `<span class="sig-dot${i < filled ? ' filled' : ''}"></span>`;
-    }
-    return html;
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   // ── STATE ─────────────────────────────────────────────────────────────
   let allArticles       = [];
-  let activeTopicFilter = null;  // null = All
-  let activeSrcFilter   = null;  // null = All
+  let activeTopicFilter = null;
+  let activeSrcFilter   = null;
 
   function setState(name) {
-    ['state-loading', 'state-error', 'state-content'].forEach(id => {
+    ['state-loading','state-error','state-content'].forEach(id => {
       $(id).style.display = id === `state-${name}` ? '' : 'none';
     });
   }
 
   function setRefreshing(on) {
-    const btn  = $('refresh-btn');
-    const icon = $('refresh-icon');
-    btn.disabled = on;
-    if (on) {
-      icon.classList.add('spin');
-    } else {
-      icon.classList.remove('spin');
-    }
+    $('refresh-btn').disabled = on;
+    $('refresh-icon').classList.toggle('spin', on);
   }
 
   // ── SIDEBAR ───────────────────────────────────────────────────────────
   function buildSidebar(articles) {
     const topicCounts  = {};
     const sourceCounts = {};
-
     articles.forEach(a => {
       if (a.topic)  topicCounts[a.topic]   = (topicCounts[a.topic]   || 0) + 1;
       if (a.source) sourceCounts[a.source] = (sourceCounts[a.source] || 0) + 1;
     });
 
-    // Topic pills
-    const allTopics = Object.keys(topicCounts);
-    const allActive = !activeTopicFilter;
-
-    const topicHtml = [
-      `<div class="topic-pill${allActive ? ' active' : ''}" onclick="setTopicFilter(null)">
-        <span class="tp-name">All</span>
-        <span class="tp-count">${articles.length}</span>
-       </div>`,
-      ...allTopics.map(t => {
-        const isActive = activeTopicFilter === t;
-        const color = topicColor(t);
-        return `<div class="topic-pill${isActive ? ' active' : ''}"
-                     style="${isActive ? `border-left-color:${color}` : ''}"
-                     onclick="setTopicFilter('${esc(t)}')">
-                  <span class="tp-name" style="${isActive ? `color:${color}` : ''}">${esc(t)}</span>
-                  <span class="tp-count" style="${isActive ? `background:${color}20;color:${color}` : ''}">${topicCounts[t]}</span>
-                </div>`;
-      })
-    ].join('');
-
-    // Source rows — show all known sources, dim ones not in today's articles
-    const allSources = [
-      'Insurance Journal', 'Claims Journal', 'Carrier Management',
-      'Reinsurance News', 'Artemis', 'Coverager'
+    // Topics
+    const topicRows = [
+      row(null, null, 'All', articles.length, activeTopicFilter === null, () => setTopicFilter(null)),
+      ...Object.keys(topicCounts).map(t =>
+        row(null, topicColor(t), t, topicCounts[t], activeTopicFilter === t, () => setTopicFilter(t))
+      )
     ];
+    $('topic-filters').innerHTML = topicRows.join('');
 
-    const sourceHtml = allSources.map(src => {
-      const count     = sourceCounts[src] || 0;
-      const isActive  = activeSrcFilter === src;
-      const isDim     = count === 0;
-      const color     = srcColor(src);
-      return `<div class="source-row${isActive ? ' active' : ''}${isDim ? ' dim' : ''}"
-                   onclick="setSrcFilter('${esc(src)}')">
-                <span class="src-dot" style="background:${color}"></span>
-                <span class="src-name">${esc(src)}</span>
-                ${count > 0 ? `<span class="src-count">${count}</span>` : ''}
-              </div>`;
+    // Sources
+    const allSrcs = ['Insurance Journal','Claims Journal','Carrier Management','Reinsurance News','Artemis','Coverager'];
+    $('source-list').innerHTML = allSrcs.map(s => {
+      const count = sourceCounts[s] || 0;
+      return row(srcColor(s), null, s, count || '', activeSrcFilter === s, () => setSrcFilter(s), count === 0);
     }).join('');
-
-    $('topic-filters').innerHTML = topicHtml;
-    $('source-list').innerHTML   = sourceHtml;
   }
 
-  function setTopicFilter(topic) {
-    activeTopicFilter = topic;
-    renderArticles(getFilteredArticles());
+  function row(dotColor, textColor, name, count, isActive, onclick, dim) {
+    const dotHtml  = dotColor ? `<span class="src-dot" style="background:${dotColor}"></span>` : '';
+    const nameStyle = textColor && isActive ? `style="color:${textColor}"` : '';
+    const countStyle = textColor && isActive ? `style="color:${textColor}"` : '';
+    return `<div class="sb-row${isActive?' active':''}${dim?' dim':''}" onclick="(${onclick.toString()})()">
+      <div class="sb-row-left">${dotHtml}<span class="sb-row-name" ${nameStyle}>${esc(name)}</span></div>
+      ${count !== '' ? `<span class="sb-row-count" ${countStyle}>${count}</span>` : ''}
+    </div>`;
+  }
+
+  function setTopicFilter(t) {
+    activeTopicFilter = t;
+    renderArticles(getFiltered());
     buildSidebar(allArticles);
   }
 
-  function setSrcFilter(src) {
-    activeSrcFilter = activeSrcFilter === src ? null : src;  // toggle
-    renderArticles(getFilteredArticles());
+  function setSrcFilter(s) {
+    activeSrcFilter = activeSrcFilter === s ? null : s;
+    renderArticles(getFiltered());
     buildSidebar(allArticles);
   }
 
-  function getFilteredArticles() {
+  function getFiltered() {
     return allArticles.filter(a => {
-      if (activeTopicFilter && a.topic !== activeTopicFilter) return false;
-      if (activeSrcFilter   && a.source !== activeSrcFilter)  return false;
+      if (activeTopicFilter && a.topic  !== activeTopicFilter) return false;
+      if (activeSrcFilter   && a.source !== activeSrcFilter)   return false;
       return true;
     });
   }
@@ -982,35 +915,33 @@
       $('articles-list').innerHTML = '<p class="no-results">No articles match this filter.</p>';
       return;
     }
-
     $('articles-list').innerHTML = articles.map((a, i) => {
-      const color     = topicColor(a.topic);
-      const sColor    = srcColor(a.source);
-      const ta        = timeAgo(a.published);
-      const hasAngle  = a.consultant_angle && a.consultant_angle.trim();
-      const dots      = significanceDots(a.significance);
+      const tc  = topicColor(a.topic);
+      const sc  = srcColor(a.source);
+      const ta  = timeAgo(a.published);
+      const num = String(i + 1).padStart(2, '0');
+      const hasAngle = a.consultant_angle && a.consultant_angle.trim();
 
       return `<a class="article-card" href="${esc(a.url)}" target="_blank" rel="noopener"
-                 style="--topic-color:${color}; animation-delay:${i * 90}ms">
-                <div class="card-top-row">
-                  <span class="topic-badge" style="background:${color}22;color:${color}">${esc(a.topic)}</span>
-                  <div class="card-meta">
-                    <span class="src-dot" style="background:${sColor}"></span>
-                    <span class="card-source">${esc(a.source)}</span>
-                    ${ta ? `<span class="card-sep">·</span><span class="card-time">${ta}</span>` : ''}
-                  </div>
-                </div>
-                <div class="card-headline">${esc(a.title)}</div>
-                ${a.summary ? `<div class="card-summary">${esc(a.summary)}</div>` : ''}
-                ${hasAngle ? `<div class="consultant-angle">
-                  <div class="angle-label">Consultant Angle</div>
-                  <div class="angle-text">${esc(a.consultant_angle)}</div>
-                </div>` : ''}
-                <div class="card-bottom-row">
-                  <div class="sig-dots">${dots}</div>
-                  <span class="read-link">Read full article →</span>
-                </div>
-              </a>`;
+                 style="animation-delay:${i * 80}ms">
+        <div class="card-top">
+          <div class="card-top-left">
+            <span class="card-rank">${num}</span>
+            <span class="topic-badge" style="background:${tc}1A;color:${tc}">${esc(a.topic)}</span>
+          </div>
+          <div class="card-top-right">
+            <span class="src-dot" style="background:${sc}"></span>
+            <span class="card-source">${esc(a.source)}</span>
+            ${ta ? `<span class="card-dot"></span><span class="card-time">${ta}</span>` : ''}
+          </div>
+        </div>
+        <div class="card-headline">${esc(a.title)}</div>
+        ${a.summary ? `<p class="card-summary">${esc(a.summary)}</p>` : ''}
+        ${hasAngle ? `<div class="consultant-angle">
+          <div class="angle-label">Why this matters</div>
+          <p class="angle-text">${esc(a.consultant_angle)}</p>
+        </div>` : ''}
+      </a>`;
     }).join('');
   }
 
@@ -1018,20 +949,12 @@
   async function loadNews() {
     setState('loading');
     setRefreshing(true);
-
-    // Show wake-up message if server is cold-starting
-    const wakeTimer = setTimeout(() => {
-      const msg = $('wake-msg');
-      if (msg) msg.style.display = '';
-    }, 6000);
-
+    const wakeTimer = setTimeout(() => { const m = $('wake-msg'); if (m) m.style.display = ''; }, 6000);
     try {
-      const ctrl = new AbortController();
+      const ctrl    = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 55000);
-
-      const resp = await fetch(`${API_BASE}/news`, { signal: ctrl.signal });
+      const resp    = await fetch(`${API_BASE}/news`, { signal: ctrl.signal });
       clearTimeout(timeout);
-
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
 
@@ -1039,59 +962,46 @@
       activeTopicFilter = null;
       activeSrcFilter   = null;
 
-      // Market pulse
-      $('pulse-text').textContent = data.market_pulse || '';
-      $('trending-pills').innerHTML = (data.trending || [])
-        .map(t => `<span class="trend-pill">${esc(t)}</span>`)
-        .join('');
-      $('last-updated').textContent = formatFetchedAt(data.fetched_at);
-
-      // Fallback banner
-      $('fallback-banner').style.display = data.ai_processed === false ? '' : 'none';
-
-      // Hide market pulse section if no AI data
+      $('pulse-text').textContent     = data.market_pulse || '';
       $('market-pulse').style.display = data.market_pulse ? '' : 'none';
+      $('trending-pills').innerHTML   = (data.trending || [])
+        .map(t => `<span class="trend-pill">${esc(t)}</span>`).join('');
+      $('last-updated').textContent       = formatFetchedAt(data.fetched_at);
+      $('fallback-banner').style.display  = data.ai_processed === false ? '' : 'none';
 
       buildSidebar(allArticles);
       renderArticles(allArticles);
       setState('content');
-
     } catch (e) {
       console.error(e);
       setState('error');
     } finally {
       clearTimeout(wakeTimer);
-      const msg = $('wake-msg');
-      if (msg) msg.style.display = 'none';
+      const m = $('wake-msg'); if (m) m.style.display = 'none';
       setRefreshing(false);
     }
   }
 
-  // ── ARTICLE READ TRACKING ─────────────────────────────────────────────
+  // ── READ TRACKING ─────────────────────────────────────────────────────
   async function logRead(url, title, source, topic) {
     try {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) return;
       await sb.from('article_reads').insert({
-        user_id:       session.user.id,
-        article_url:   url,
-        article_title: title,
-        source:        source,
-        category:      topic || null,
+        user_id: session.user.id, article_url: url,
+        article_title: title, source, category: topic || null,
       });
       await sb.rpc('increment_articles_read', { uid: session.user.id }).catch(() => {});
     } catch (_) {}
   }
 
-  // Delegated click listener — tracks article card clicks
   document.addEventListener('click', e => {
     const card = e.target.closest('a.article-card');
     if (!card) return;
-    const article = allArticles.find(a => a.url === card.href);
-    if (article) logRead(article.url, article.title, article.source, article.topic);
+    const a = allArticles.find(x => x.url === card.href);
+    if (a) logRead(a.url, a.title, a.source, a.topic);
   });
 
-  // ── INIT ──────────────────────────────────────────────────────────────
   setNavDate();
   initAuth().then(ok => { if (ok) loadNews(); });
 </script>
