@@ -526,24 +526,47 @@ async def get_news():
 
     all_articles = [a for a in all_articles if is_fresh(a)]
 
-    # Score + pick top 10 before enriching
+    # Global top 10 — scored and ranked across all sources
     top_10 = score_and_rank(all_articles)
-
-    # Fetch summaries in parallel for articles that don't have one
     top_10 = enrich_summaries(top_10)
 
+    # Per-source top 5 — most recent articles per source for source filtering
+    source_groups: dict = {}
+    for a in all_articles:
+        src = a["source"]
+        if src not in source_groups:
+            source_groups[src] = []
+        source_groups[src].append(a)
+
+    by_source: dict = {}
+    for src, arts in source_groups.items():
+        # Sort by date descending, take top 5
+        arts_sorted = sorted(arts, key=lambda x: best_date(x) or datetime.min, reverse=True)
+        by_source[src] = [
+            {
+                "title":      a["title"],
+                "url":        a["url"],
+                "source":     a["source"],
+                "date":       a["date"] or (best_date(a) or datetime.min).strftime("%b %d, %Y") if best_date(a) else "",
+                "summary":    a["summary"],
+                "is_trending": a["is_trending"],
+            }
+            for a in arts_sorted[:5]
+        ]
+
     return {
-        "articles": top_10,
+        "articles":   top_10,
+        "by_source":  by_source,
         "fetched_at": datetime.utcnow().isoformat() + "Z",
         "stats": {
-            "total_scraped":        len(all_articles),
-            "insurance_journal":    len(ij),
-            "business_insurance":   len(bi),
-            "carrier_management":   len(cm),
-            "claims_journal":       len(cj),
+            "total_scraped":          len(all_articles),
+            "insurance_journal":      len(ij),
+            "business_insurance":     len(bi),
+            "carrier_management":     len(cm),
+            "claims_journal":         len(cj),
             "insurance_business_mag": len(ibm),
-            "property_casualty_360": len(pc),
-            "risk_and_insurance":   len(ri),
+            "property_casualty_360":  len(pc),
+            "risk_and_insurance":     len(ri),
         },
     }
 

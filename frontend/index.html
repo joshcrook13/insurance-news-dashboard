@@ -234,6 +234,7 @@
       background: var(--bg-hover);
     }
     .cat-row.active .cat-name { color: var(--text); font-weight: 600; }
+    .cat-row.dimmed { opacity: 0.35; pointer-events: none; }
 
     .cat-name {
       font-size: 12px;
@@ -922,17 +923,22 @@
 
   // ── SIDEBAR ──
   let allArticles  = [];
+  let bySource     = {};
   let activeSource = "All";
 
-  function buildSidebar(articles) {
+  function buildSidebar() {
     $("cat-nav").innerHTML = SOURCES.map(s => {
       const count = s.name === "All"
-        ? articles.length
-        : articles.filter(a => a.source === s.name || (a.sources||[]).includes(s.name)).length;
+        ? allArticles.length
+        : (bySource[s.name] || []).length;
+      const dot = s.name === "All"
+        ? ""
+        : `<span class="src-dot" style="background:${srcColor(s.name)};margin-right:6px;flex-shrink:0"></span>`;
+      const dimmed = count === 0 && s.name !== "All" ? " dimmed" : "";
       return `
-        <div class="cat-row${activeSource === s.name ? " active" : ""}"
+        <div class="cat-row${activeSource === s.name ? " active" : ""}${dimmed}"
              onclick="selectSource('${esc(s.name)}')">
-          <span class="cat-name">${esc(s.name)}</span>
+          ${dot}<span class="cat-name">${esc(s.name)}</span>
           <span class="cat-count">${count}</span>
         </div>`;
     }).join("");
@@ -940,11 +946,9 @@
 
   function selectSource(name) {
     activeSource = name;
-    const filtered = name === "All"
-      ? allArticles
-      : allArticles.filter(a => a.source === name || (a.sources||[]).includes(name));
-    renderContent(filtered);
-    buildSidebar(allArticles);
+    const articles = name === "All" ? allArticles : (bySource[name] || []);
+    renderContent(articles);
+    buildSidebar();
   }
 
   // ── TOPIC TAG HTML ──
@@ -1092,10 +1096,11 @@
       if (!data.articles?.length) throw new Error("empty");
 
       allArticles  = data.articles;
+      bySource     = data.by_source || {};
       activeSource = "All";
 
       renderContent(allArticles);
-      buildSidebar(allArticles);
+      buildSidebar();
       setState("loaded");
     } catch(e) {
       console.error(e);
