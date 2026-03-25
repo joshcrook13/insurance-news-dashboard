@@ -762,7 +762,7 @@
 
   <!-- FOOTER -->
   <footer id="footer">
-    <span>Insurance Journal · Reinsurance News · Business Insurance · The Insurer · Insurance Age · Post Magazine · Insurance Business</span>
+    <span>Insurance Journal · Claims Journal · Carrier Management · Reinsurance News · Artemis · Coverager</span>
     <span>Built with Claude Code</span>
   </footer>
 
@@ -827,12 +827,11 @@
   function srcColor(source) {
     const s = (source || '').toLowerCase();
     if (s.includes('insurance journal'))  return '#1D4ED8';
+    if (s.includes('claims journal'))     return '#059669';
+    if (s.includes('carrier management')) return '#0891B2';
     if (s.includes('reinsurance news'))   return '#7C3AED';
-    if (s.includes('business insurance')) return '#0891B2';
-    if (s.includes('the insurer'))        return '#059669';
-    if (s.includes('insurance age'))      return '#DB2777';
-    if (s.includes('post magazine'))      return '#EA580C';
-    if (s.includes('insurance business')) return '#BE185D';
+    if (s.includes('artemis'))            return '#EF4444';
+    if (s.includes('coverager'))          return '#F59E0B';
     return '#C9A84C';
   }
 
@@ -936,8 +935,8 @@
 
     // Source rows — show all known sources, dim ones not in today's articles
     const allSources = [
-      'Insurance Journal', 'Reinsurance News', 'Business Insurance',
-      'The Insurer', 'Insurance Age', 'Post Magazine', 'Insurance Business'
+      'Insurance Journal', 'Claims Journal', 'Carrier Management',
+      'Reinsurance News', 'Artemis', 'Coverager'
     ];
 
     const sourceHtml = allSources.map(src => {

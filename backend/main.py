@@ -32,12 +32,11 @@ CACHE_TTL = 1800  # 30 minutes
 # ── RSS Feeds ───────────────────────────────────────────────────────────────
 RSS_FEEDS = [
     ("Insurance Journal",  "https://www.insurancejournal.com/feed/"),
+    ("Claims Journal",     "https://www.claimsjournal.com/feed/"),
+    ("Carrier Management", "https://www.carriermanagement.com/feed/"),
     ("Reinsurance News",   "https://www.reinsurancene.ws/feed/"),
-    ("Business Insurance", "https://www.businessinsurance.com/rss/news"),
-    ("The Insurer",        "https://www.theinsurer.com/feed/"),
-    ("Insurance Age",      "https://www.insuranceage.co.uk/feed"),
-    ("Post Magazine",      "https://www.postonline.co.uk/rss"),
-    ("Insurance Business", "https://www.insurancebusinessmag.com/rss/news"),
+    ("Artemis",            "https://www.artemis.bm/feed/"),
+    ("Coverager",          "https://coverager.com/feed/"),
 ]
 
 # ── Claude prompt ───────────────────────────────────────────────────────────
