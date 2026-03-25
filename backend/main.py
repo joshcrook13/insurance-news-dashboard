@@ -259,11 +259,22 @@ async def health():
 # ── Companies ────────────────────────────────────────────────────────────────
 
 COMPANIES = [
-    {"name": "Swiss Re",  "initials": "SR",  "color": "#1D4ED8", "type": "Reinsurer",       "url": "https://www.swissre.com",   "feed_url": "https://www.swissre.com/rss/press-releases.rss"},
-    {"name": "Munich Re", "initials": "MR",  "color": "#7C3AED", "type": "Reinsurer",       "url": "https://www.munichre.com",  "feed_url": "https://www.munichre.com/en/media-relations/news/rss.html"},
-    {"name": "AIG",       "initials": "AIG", "color": "#DC2626", "type": "Primary Insurer", "url": "https://www.aig.com",       "feed_url": "https://newsroom.aig.com/rss/aig-press-releases.xml"},
-    {"name": "Chubb",     "initials": "CB",  "color": "#2D7A4F", "type": "Primary Insurer", "url": "https://www.chubb.com",     "feed_url": "https://news.chubb.com/rss/news-releases.xml"},
-    {"name": "Allianz",   "initials": "AZ",  "color": "#C4922A", "type": "Primary Insurer", "url": "https://www.allianz.com",  "feed_url": "https://www.allianz.com/en/press/news/_rss.html"},
+    # Reinsurers
+    {"name": "Swiss Re",       "initials": "SR",  "color": "#0047BB", "type": "Reinsurer",        "url": "https://www.swissre.com",        "feed_url": "https://www.swissre.com/rss/press-releases.rss"},
+    {"name": "Munich Re",      "initials": "MR",  "color": "#6B21A8", "type": "Reinsurer",        "url": "https://www.munichre.com",       "feed_url": "https://www.munichre.com/en/media-relations/news/rss.html"},
+    # Primary insurers
+    {"name": "Aviva",          "initials": "AV",  "color": "#0073CF", "type": "Primary Insurer",  "url": "https://www.aviva.com",          "feed_url": "https://www.aviva.com/newsroom/rss/"},
+    {"name": "Allianz",        "initials": "AZ",  "color": "#C4922A", "type": "Primary Insurer",  "url": "https://www.allianz.com",        "feed_url": "https://www.allianz.com/en/press/news/_rss.html"},
+    {"name": "Zurich",         "initials": "ZR",  "color": "#003082", "type": "Primary Insurer",  "url": "https://www.zurich.com",         "feed_url": "https://www.zurich.com/en/media/news/all-news/_jcr_content.feed"},
+    {"name": "Chubb",          "initials": "CB",  "color": "#2D7A4F", "type": "Primary Insurer",  "url": "https://www.chubb.com",          "feed_url": "https://news.chubb.com/rss/news-releases.xml"},
+    {"name": "AIG",            "initials": "AIG", "color": "#DC2626", "type": "Primary Insurer",  "url": "https://www.aig.com",            "feed_url": "https://newsroom.aig.com/rss/aig-press-releases.xml"},
+    # Brokers
+    {"name": "Aon",            "initials": "AN",  "color": "#C8102E", "type": "Broker",           "url": "https://www.aon.com",            "feed_url": "https://newsroom.aon.com/rss/aon-news-releases.xml"},
+    {"name": "Marsh McLennan", "initials": "MM",  "color": "#00508F", "type": "Broker",           "url": "https://www.mmc.com",            "feed_url": "https://newsroom.mmc.com/rss/mmc-news-releases.xml"},
+    {"name": "Gallagher",      "initials": "GB",  "color": "#F47A1F", "type": "Broker",           "url": "https://www.ajg.com",            "feed_url": "https://www.ajg.com/us/news-and-insights/press-releases/?format=rss"},
+    # Specialty
+    {"name": "Hiscox",         "initials": "HX",  "color": "#E04E39", "type": "Specialty",        "url": "https://www.hiscoxgroup.com",    "feed_url": "https://www.hiscoxgroup.com/rss/news"},
+    {"name": "Beazley",        "initials": "BZ",  "color": "#004B87", "type": "Specialty",        "url": "https://www.beazley.com",        "feed_url": "https://www.beazley.com/news.rss"},
 ]
 
 _companies_cache: dict = {"data": None, "ts": 0.0}
