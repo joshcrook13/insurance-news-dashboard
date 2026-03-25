@@ -27,6 +27,8 @@
       --src-cm:    #0891B2;
       --src-cj:    #059669;
       --src-ibm:   #DB2777;
+      --src-pc:    #EA580C;
+      --src-ri:    #BE185D;
       --src-multi: #C9A84C;
     }
 
@@ -733,7 +735,7 @@
 
   <!-- LEFT SIDEBAR -->
   <aside id="sidebar">
-    <span class="sb-label">Categories</span>
+    <span class="sb-label">Sources</span>
     <div id="cat-nav"></div>
   </aside>
 
@@ -839,19 +841,33 @@
     window.location.replace('login.html');
   }
 
-  // ── CATEGORY DEFINITIONS ──
-  const CATS = [
-    { name: "All", keys: [] },
-    { name: "Property & Casualty", keys: ["property","casualty","homeowner","home","liability","p&c","fire","flood","theft","dwelling","damage"] },
-    { name: "Reinsurance",         keys: ["reinsurance","reinsurer","retrocession","treaty","facultative","swiss re","munich re","cedent"] },
-    { name: "Markets",             keys: ["investment","acquisition","merger","premium","rate","pricing","revenue","profit","loss ratio","combined ratio"] },
-    { name: "Cyber",               keys: ["cyber","ransomware","data breach","hack","malware","technology","digital","ai","cloud"] },
-    { name: "Climate & CAT",       keys: ["climate","catastrophe","cat","flood","wildfire","hurricane","tornado","earthquake","storm","esg"] },
-    { name: "Life & Health",       keys: ["life","health","medical","mortality","longevity","annuity","pension","benefit","wellness"] },
-    { name: "Regulatory",          keys: ["naic","fca","regulatory","regulation","compliance","legislation","bill","law","ruling","mandate"] },
-    { name: "Commercial",          keys: ["commercial","corporate","enterprise","workers compensation","employer","sme","business insurance"] },
-    { name: "Motor",               keys: ["motor","auto","vehicle","car","truck","fleet"," ev ","electric vehicle"] },
+  // ── SOURCE DEFINITIONS ──
+  const SOURCES = [
+    { name: "All" },
+    { name: "Insurance Journal" },
+    { name: "Business Insurance" },
+    { name: "Carrier Management" },
+    { name: "Claims Journal" },
+    { name: "Insurance Business" },
+    { name: "PropertyCasualty360" },
+    { name: "Risk & Insurance" },
   ];
+
+  // ── TOPIC TAGS (title-only, 4 tight categories) ──
+  const TOPIC_TAGS = [
+    { name: "Cyber",         words: ["cyber","ransomware","data breach","hack","malware","phishing"] },
+    { name: "Climate & CAT", words: ["hurricane","wildfire","catastrophe","earthquake","flood","typhoon","tornado","nat cat"] },
+    { name: "Reinsurance",   words: ["reinsurance","reinsurer","retrocession","treaty","facultative"] },
+    { name: "Regulatory",    words: ["naic","fca","pra","legislation","regulation","solvency","compliance"] },
+  ];
+
+  function getTopicTag(title) {
+    const t = (title || "").toLowerCase();
+    for (const tag of TOPIC_TAGS) {
+      if (tag.words.some(w => t.includes(w))) return tag.name;
+    }
+    return null;
+  }
 
   // ── DATE ──
   function setNavDate() {
@@ -883,100 +899,71 @@
   // ── SOURCE COLOUR ──
   function srcColor(source) {
     const s = (source||"").toLowerCase();
-    if (s.includes("insurance journal"))  return "var(--src-ij)";
-    if (s.includes("business insurance")) return "var(--src-bi)";
-    if (s.includes("carrier management")) return "var(--src-cm)";
-    if (s.includes("claims journal"))     return "var(--src-cj)";
-    if (s.includes("insurance business")) return "var(--src-ibm)";
+    if (s.includes("insurance journal"))    return "var(--src-ij)";
+    if (s.includes("business insurance"))   return "var(--src-bi)";
+    if (s.includes("carrier management"))   return "var(--src-cm)";
+    if (s.includes("claims journal"))       return "var(--src-cj)";
+    if (s.includes("insurance business"))   return "var(--src-ibm)";
+    if (s.includes("propertycasualty360"))  return "var(--src-pc)";
+    if (s.includes("risk & insurance") || s.includes("risk and insurance")) return "var(--src-ri)";
     return "var(--src-multi)";
   }
   function srcCardClass(source) {
     const s = (source||"").toLowerCase();
-    if (s.includes("insurance journal"))  return "c-ij";
-    if (s.includes("business insurance")) return "c-bi";
-    if (s.includes("carrier management")) return "c-cm";
-    if (s.includes("claims journal"))     return "c-cj";
-    if (s.includes("insurance business")) return "c-ibm";
+    if (s.includes("insurance journal"))    return "c-ij";
+    if (s.includes("business insurance"))   return "c-bi";
+    if (s.includes("carrier management"))   return "c-cm";
+    if (s.includes("claims journal"))       return "c-cj";
+    if (s.includes("insurance business"))   return "c-ibm";
+    if (s.includes("propertycasualty360"))  return "c-pc";
+    if (s.includes("risk & insurance") || s.includes("risk and insurance")) return "c-ri";
     return "c-multi";
   }
 
-  // ── CATEGORY MATCHING ──
-  function getCategories(article) {
-    const haystack = ((article.title || "") + " " + (article.summary || "")).toLowerCase();
-    const matched = [];
-    for (const cat of CATS) {
-      if (cat.name === "All") continue;
-      if (cat.keys.some(k => haystack.includes(k))) {
-        matched.push(cat.name);
-      }
-    }
-    return matched.length ? matched : ["Markets"];
-  }
-
-  function catTagsHtml(cats, max = 2, ai = false) {
-    const tags = cats.slice(0, max).map(c => `<span class="cat-tag">${esc(c)}</span>`).join("");
-    const badge = ai ? `<span class="cat-tag ai-badge">AI</span>` : "";
-    return tags + badge;
-  }
-
-  function pendingTagsHtml() {
-    return `<span class="cat-tag cat-pending">Categorising…</span>`;
-  }
-
   // ── SIDEBAR ──
-  let allArticles = [];
-  let activeCat   = "All";
+  let allArticles  = [];
+  let activeSource = "All";
 
   function buildSidebar(articles) {
-    const counts = {};
-    for (const cat of CATS) {
-      if (cat.name === "All") { counts["All"] = articles.length; continue; }
-      counts[cat.name] = articles.filter(a => {
-        const h = ((a.title||"")+" "+(a.summary||"")).toLowerCase();
-        return cat.keys.some(k => h.includes(k));
-      }).length;
-    }
-
-    $("cat-nav").innerHTML = CATS.map(cat => `
-      <div class="cat-row${activeCat === cat.name ? " active" : ""}"
-           onclick="selectCat('${esc(cat.name)}')">
-        <span class="cat-name">${esc(cat.name)}</span>
-        <span class="cat-count">${counts[cat.name] || 0}</span>
-      </div>
-    `).join("");
+    $("cat-nav").innerHTML = SOURCES.map(s => {
+      const count = s.name === "All"
+        ? articles.length
+        : articles.filter(a => a.source === s.name || (a.sources||[]).includes(s.name)).length;
+      return `
+        <div class="cat-row${activeSource === s.name ? " active" : ""}"
+             onclick="selectSource('${esc(s.name)}')">
+          <span class="cat-name">${esc(s.name)}</span>
+          <span class="cat-count">${count}</span>
+        </div>`;
+    }).join("");
   }
 
-  function selectCat(name) {
-    activeCat = name;
-    let filtered;
-    if (name === "All") {
-      filtered = allArticles;
-    } else {
-      filtered = allArticles.filter(a => {
-        // Use AI categories if available, otherwise fall back to keyword matching
-        if (a._categories?.length) return a._categories.includes(name);
-        const catDef = CATS.find(c => c.name === name);
-        const h = ((a.title||"")+" "+(a.summary||"")).toLowerCase();
-        return catDef.keys.some(k => h.includes(k));
-      });
-    }
+  function selectSource(name) {
+    activeSource = name;
+    const filtered = name === "All"
+      ? allArticles
+      : allArticles.filter(a => a.source === name || (a.sources||[]).includes(name));
     renderContent(filtered);
     buildSidebar(allArticles);
   }
 
+  // ── TOPIC TAG HTML ──
+  function topicTagHtml(title) {
+    const tag = getTopicTag(title);
+    return tag ? `<span class="cat-tag">${esc(tag)}</span>` : "";
+  }
+
   // ── RENDER ──
   function renderContent(articles) {
-    const content = $("content");
-
     if (!articles.length) {
-      content.innerHTML = `<p class="no-results">No articles in this category.</p>`;
+      $("content").innerHTML = `<p class="no-results">No articles from this source.</p>`;
       return;
     }
 
-    const filtered = activeCat !== "All";
+    const filtered = activeSource !== "All";
 
     if (filtered) {
-      // ── FILTERED VIEW: uniform list, no hero, no grid ──
+      // Uniform ranked list — no hero, no grid
       $("hero-wrap").innerHTML = "";
       $("grid-wrap").style.display = "none";
       $("brief-wrap").style.display = "";
@@ -990,9 +977,9 @@
             <span class="src-dot" style="background:${col}"></span>
             <div class="brief-center">
               <div class="brief-title">${esc(a.title)}</div>
-              <div class="brief-meta" id="f-cats-${i}">
+              <div class="brief-meta">
                 <span class="brief-src">${esc(a.source)}</span>
-                ${pendingTagsHtml()}
+                ${topicTagHtml(a.title)}
               </div>
             </div>
             <div class="brief-right">
@@ -1004,7 +991,7 @@
       return;
     }
 
-    // ── ALL VIEW: hero + grid + briefing ──
+    // All view: hero + grid + briefing
     $("brief-header").style.display = "";
     const h = articles[0];
     $("hero-wrap").innerHTML = `
@@ -1017,15 +1004,14 @@
         <div class="hero-title">${esc(h.title)}</div>
         <div class="hero-summary">${esc(h.summary) || "Click to read the full article."}</div>
         <div class="hero-foot">
-          <div class="hero-cats" id="a-cats-0">${pendingTagsHtml()}</div>
+          <div class="hero-cats">${topicTagHtml(h.title)}</div>
           <span class="hero-cta">Read full article →</span>
         </div>
       </a>`;
 
-    // Grid (articles 1–4)
     const gridArts = articles.slice(1, 5);
     if (gridArts.length) {
-      $("story-grid").innerHTML = gridArts.map((a, i) => {
+      $("story-grid").innerHTML = gridArts.map(a => {
         const cc = srcCardClass(a.source);
         const col = srcColor(a.source);
         return `
@@ -1037,7 +1023,7 @@
             </div>
             <div class="story-title">${esc(a.title)}</div>
             <div class="story-summary">${esc(a.summary) || ""}</div>
-            <div class="story-foot" id="a-cats-${i + 1}">${pendingTagsHtml()}</div>
+            <div class="story-foot">${topicTagHtml(a.title)}</div>
           </a>`;
       }).join("");
       $("grid-wrap").style.display = "";
@@ -1045,7 +1031,6 @@
       $("grid-wrap").style.display = "none";
     }
 
-    // Briefing (articles 5–9)
     const briefArts = articles.slice(5, 10);
     if (briefArts.length) {
       $("brief-list").innerHTML = briefArts.map((a, i) => {
@@ -1057,9 +1042,9 @@
             <span class="src-dot" style="background:${col}"></span>
             <div class="brief-center">
               <div class="brief-title">${esc(a.title)}</div>
-              <div class="brief-meta" id="a-cats-${i + 5}">
+              <div class="brief-meta">
                 <span class="brief-src">${esc(a.source)}</span>
-                ${pendingTagsHtml()}
+                ${topicTagHtml(a.title)}
               </div>
             </div>
             <div class="brief-right">
@@ -1074,90 +1059,6 @@
     }
   }
 
-  // ── AI CATEGORISATION ──
-  async function categoriseArticles(articles) {
-    const payload = articles.map((a, i) => ({
-      id: i,
-      title: a.title || "",
-      summary: a.summary || "",
-    }));
-
-    let results, isAi = false;
-
-    try {
-      const res = await fetch(`${API_BASE}/categorise`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articles: payload }),
-        signal: AbortSignal.timeout(30000),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      results = data.results;
-      isAi = data.method === "ai";
-    } catch(e) {
-      console.warn("Categorise endpoint failed, using frontend keywords:", e);
-      results = payload.map(a => ({ id: a.id, categories: getCategories(articles[a.id]) }));
-      isAi = false;
-    }
-
-    // Update DOM for each article
-    results.forEach(({ id, categories }) => {
-      const el = $(`a-cats-${id}`);
-      if (!el) return;
-      const cats = categories?.length ? categories : ["Markets"];
-      // Brief rows (5-9) have source name already inside — just append tags
-      if (id >= 5) {
-        const src = el.querySelector(".brief-src");
-        el.innerHTML = "";
-        if (src) el.appendChild(src);
-        cats.slice(0, 1).forEach(c => {
-          const span = document.createElement("span");
-          span.className = "cat-tag";
-          span.textContent = c;
-          el.appendChild(span);
-        });
-        if (isAi) {
-          const ai = document.createElement("span");
-          ai.className = "cat-tag ai-badge";
-          ai.textContent = "AI";
-          el.appendChild(ai);
-        }
-      } else {
-        el.innerHTML = catTagsHtml(cats, id === 0 ? 3 : 2, isAi);
-      }
-    });
-
-    // Store AI categories on article objects and cache by URL
-    const articleCatMap = {};
-    results.forEach(({ id, categories }) => {
-      articleCatMap[id] = categories || [];
-      if (articles[id]) {
-        articles[id]._categories = categories || [];
-        if (articles[id].url) articleCategoryCache[articles[id].url] = categories || [];
-      }
-    });
-    // Also update allArticles in place so selectCat uses AI categories
-    results.forEach(({ id, categories }) => {
-      if (allArticles[id]) allArticles[id]._categories = categories || [];
-    });
-    rebuildSidebarWithAiCats(articles, articleCatMap);
-  }
-
-  function rebuildSidebarWithAiCats(articles, catMap) {
-    const counts = { All: articles.length };
-    for (const cat of CATS) {
-      if (cat.name === "All") continue;
-      counts[cat.name] = Object.values(catMap).filter(cats => cats.includes(cat.name)).length;
-    }
-    $("cat-nav").innerHTML = CATS.map(cat => `
-      <div class="cat-row${activeCat === cat.name ? " active" : ""}"
-           onclick="selectCat('${esc(cat.name)}')">
-        <span class="cat-name">${esc(cat.name)}</span>
-        <span class="cat-count">${counts[cat.name] || 0}</span>
-      </div>
-    `).join("");
-  }
 
   // ── STATE ──
   function setState(s) {
@@ -1190,14 +1091,12 @@
       const data = await res.json();
       if (!data.articles?.length) throw new Error("empty");
 
-      allArticles = data.articles;
-      activeCat = "All";
+      allArticles  = data.articles;
+      activeSource = "All";
 
       renderContent(allArticles);
       buildSidebar(allArticles);
       setState("loaded");
-      // Fire-and-forget: categorise in background, updates DOM when ready
-      categoriseArticles(allArticles);
     } catch(e) {
       console.error(e);
       setState("error");
@@ -1209,22 +1108,18 @@
   }
 
   // ── ARTICLE READ TRACKING ──
-  // articleCategoryCache: populated by categoriseArticles, maps url → [categories]
-  const articleCategoryCache = {};
-
   async function logRead(url, title, source) {
     try {
       const { data: { session } } = await sb.auth.getSession();
       if (!session) return;
-      const category = (articleCategoryCache[url] || [])[0] || null;
+      const tag = getTopicTag(title);
       await sb.from('article_reads').insert({
         user_id:       session.user.id,
         article_url:   url,
         article_title: title,
         source:        source,
-        category:      category,
+        category:      tag,
       });
-      // Increment articles_read counter
       await sb.rpc('increment_articles_read', { uid: session.user.id }).catch(() => {});
     } catch(_) {}
   }

@@ -125,6 +125,37 @@ def make_absolute(href: str, base: str) -> str:
     return href
 
 
+def harvest_links(
+    soup: BeautifulSoup,
+    base_url: str,
+    source_name: str,
+    href_pattern: str,
+    limit: int = 25,
+) -> List[Dict[str, Any]]:
+    """Harvest article links whose href matches href_pattern regex."""
+    seen: set = set()
+    articles: List[Dict[str, Any]] = []
+    for link in soup.find_all("a", href=True):
+        href = make_absolute(link.get("href", ""), base_url)
+        if not re.search(href_pattern, href):
+            continue
+        title = link.get_text(strip=True)
+        if len(title) < 20:
+            parent = link.find_parent(["h1", "h2", "h3", "h4"])
+            if parent:
+                title = parent.get_text(strip=True)
+        if len(title) < 20 or href in seen:
+            continue
+        seen.add(href)
+        articles.append({
+            "title": title, "url": href, "source": source_name,
+            "date": "", "summary": "", "is_trending": False, "comment_count": 0,
+        })
+        if len(articles) >= limit:
+            break
+    return articles
+
+
 def _extract_articles(
     soup: BeautifulSoup,
     source_name: str,
@@ -205,68 +236,47 @@ def _extract_articles(
 
 def scrape_insurance_journal() -> List[Dict[str, Any]]:
     articles: List[Dict[str, Any]] = []
-    urls = [
-        "https://www.insurancejournal.com/news/",
-        "https://www.insurancejournal.com/",
-    ]
-    for url in urls:
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=15)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "lxml")
-            articles = _extract_articles(
-                soup,
-                source_name="Insurance Journal",
-                base_url="https://www.insurancejournal.com",
-                item_selectors=[
-                    "article",
-                    "div.widget-story",
-                    "li.article-list__item",
-                    "div.article-list-item",
-                    "div.featured-article",
-                    "div.news-list__item",
-                    ".IJ-article",
-                ],
-                fallback_href_pattern="/news/",
-            )
-            if articles:
-                break
-        except Exception as e:
-            logger.error(f"Insurance Journal ({url}): {e}")
-    logger.info(f"Insurance Journal scraped: {len(articles)}")
+    try:
+        resp = requests.get("https://www.insurancejournal.com/news/", headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        # IJ URLs contain /news/<region>/YYYY/MM/DD/
+        articles = harvest_links(soup, "https://www.insurancejournal.com",
+                                 "Insurance Journal", r"/news/\w+/\d{4}/\d{2}/\d{2}/")
+    except Exception as e:
+        logger.error(f"Insurance Journal: {e}")
+    logger.info(f"Insurance Journal: {len(articles)}")
     return articles
 
 
 def scrape_business_insurance() -> List[Dict[str, Any]]:
     articles: List[Dict[str, Any]] = []
-    urls = [
-        "https://www.businessinsurance.com/",
-        "https://www.businessinsurance.com/section/news",
-    ]
-    for url in urls:
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=15)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "lxml")
-            articles = _extract_articles(
-                soup,
-                source_name="Business Insurance",
-                base_url="https://www.businessinsurance.com",
-                item_selectors=[
-                    "article",
-                    "div.article-item",
-                    "div.story",
-                    "li.headline-list__item",
-                    "div.summary-news-item",
-                    ".article-summary",
-                ],
-                fallback_href_pattern="article",
-            )
-            if articles:
-                break
-        except Exception as e:
-            logger.error(f"Business Insurance ({url}): {e}")
-    logger.info(f"Business Insurance scraped: {len(articles)}")
+    try:
+        resp = requests.get("https://www.businessinsurance.com/", headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        # Elementor-based site — extract from post cards
+        seen: set = set()
+        for card in soup.select(".elementor-post"):
+            a = card.select_one(".elementor-post__title a, h2 a, h3 a, a[href]")
+            if not a:
+                continue
+            href = make_absolute(a.get("href", ""), "https://www.businessinsurance.com")
+            title = a.get_text(strip=True)
+            date_el = card.select_one(".elementor-post__meta-data, time, [class*='date']")
+            date_str = date_el.get_text(strip=True) if date_el else ""
+            if len(title) < 20 or href in seen:
+                continue
+            seen.add(href)
+            articles.append({"title": title, "url": href, "source": "Business Insurance",
+                             "date": date_str, "summary": "", "is_trending": False, "comment_count": 0})
+        # Fallback if Elementor selectors miss
+        if not articles:
+            articles = harvest_links(soup, "https://www.businessinsurance.com",
+                                     "Business Insurance", r"businessinsurance\.com/article/")
+    except Exception as e:
+        logger.error(f"Business Insurance: {e}")
+    logger.info(f"Business Insurance: {len(articles)}")
     return articles
 
 
@@ -276,90 +286,68 @@ def scrape_carrier_management() -> List[Dict[str, Any]]:
         resp = requests.get("https://www.carriermanagement.com/news/", headers=HEADERS, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "lxml")
-        articles = _extract_articles(
-            soup,
-            source_name="Carrier Management",
-            base_url="https://www.carriermanagement.com",
-            item_selectors=[
-                "article",
-                "div.article-feature",
-                "div.news-list-item",
-                "li.article",
-            ],
-            fallback_href_pattern="/news/",
-        )
+        articles = harvest_links(soup, "https://www.carriermanagement.com",
+                                 "Carrier Management", r"/(?:news|features)/\d{4}/\d{2}/\d{2}/")
     except Exception as e:
         logger.error(f"Carrier Management: {e}")
-    logger.info(f"Carrier Management scraped: {len(articles)}")
+    logger.info(f"Carrier Management: {len(articles)}")
     return articles
 
 
 def scrape_claims_journal() -> List[Dict[str, Any]]:
     articles: List[Dict[str, Any]] = []
-    urls = [
-        "https://www.claimsjournal.com/news/national/",
-        "https://www.claimsjournal.com/",
-    ]
-    for url in urls:
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=15)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "lxml")
-            articles = _extract_articles(
-                soup,
-                source_name="Claims Journal",
-                base_url="https://www.claimsjournal.com",
-                item_selectors=[
-                    "article",
-                    "div.article-feature",
-                    "div.widget-story",
-                    "li.article-list__item",
-                ],
-                fallback_href_pattern="/news/",
-            )
-            if articles:
-                break
-        except Exception as e:
-            logger.error(f"Claims Journal ({url}): {e}")
-    logger.info(f"Claims Journal scraped: {len(articles)}")
+    try:
+        resp = requests.get("https://www.claimsjournal.com/news/national/", headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        articles = harvest_links(soup, "https://www.claimsjournal.com",
+                                 "Claims Journal", r"/news/\w+/\d{4}/\d{2}/\d{2}/")
+    except Exception as e:
+        logger.error(f"Claims Journal: {e}")
+    logger.info(f"Claims Journal: {len(articles)}")
     return articles
 
 
 def scrape_insurance_business_mag() -> List[Dict[str, Any]]:
     articles: List[Dict[str, Any]] = []
-    urls = [
-        "https://www.insurancebusinessmag.com/us/",
-        "https://www.insurancebusinessmag.com/us/news/",
-    ]
-    for url in urls:
-        try:
-            resp = requests.get(url, headers=HEADERS, timeout=15)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, "lxml")
+    try:
+        resp = requests.get("https://www.insurancebusinessmag.com/us/", headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        articles = harvest_links(soup, "https://www.insurancebusinessmag.com",
+                                 "Insurance Business", r"/us/news/.*\.aspx")
+    except Exception as e:
+        logger.error(f"Insurance Business Mag: {e}")
+    logger.info(f"Insurance Business Mag: {len(articles)}")
+    return articles
 
-            # IBM uses plain <a> links — harvest all news links
-            seen: set = set()
-            for link in soup.select("a[href*='/us/news/']"):
-                href = link.get("href", "")
-                title = link.get_text(strip=True)
-                if len(title) < 20 or href in seen:
-                    continue
-                seen.add(href)
-                full_href = make_absolute(href, "https://www.insurancebusinessmag.com")
-                articles.append({
-                    "title": title,
-                    "url": full_href,
-                    "source": "Insurance Business",
-                    "date": "",
-                    "summary": "",
-                    "is_trending": False,
-                    "comment_count": 0,
-                })
-            if articles:
-                break
-        except Exception as e:
-            logger.error(f"Insurance Business Mag ({url}): {e}")
-    logger.info(f"Insurance Business Mag scraped: {len(articles)}")
+
+def scrape_property_casualty_360() -> List[Dict[str, Any]]:
+    articles: List[Dict[str, Any]] = []
+    try:
+        resp = requests.get("https://www.propertycasualty360.com/", headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        # PC360 URLs contain /YYYY/MM/DD/
+        articles = harvest_links(soup, "https://www.propertycasualty360.com",
+                                 "PropertyCasualty360", r"propertycasualty360\.com/\d{4}/\d{2}/\d{2}/")
+    except Exception as e:
+        logger.error(f"PropertyCasualty360: {e}")
+    logger.info(f"PropertyCasualty360: {len(articles)}")
+    return articles
+
+
+def scrape_risk_and_insurance() -> List[Dict[str, Any]]:
+    articles: List[Dict[str, Any]] = []
+    try:
+        resp = requests.get("https://riskandinsurance.com/news/", headers=HEADERS, timeout=15)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "lxml")
+        articles = harvest_links(soup, "https://riskandinsurance.com",
+                                 "Risk & Insurance", r"riskandinsurance\.com/[a-z0-9\-]{20,}/")
+    except Exception as e:
+        logger.error(f"Risk & Insurance: {e}")
+    logger.info(f"Risk & Insurance: {len(articles)}")
     return articles
 
 
@@ -504,10 +492,12 @@ async def get_news():
         scrape_carrier_management,
         scrape_claims_journal,
         scrape_insurance_business_mag,
+        scrape_property_casualty_360,
+        scrape_risk_and_insurance,
     ]
 
     results: dict = {}
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    with ThreadPoolExecutor(max_workers=7) as pool:
         futures = {pool.submit(fn): fn.__name__ for fn in scrapers}
         for future in as_completed(futures):
             name = futures[future]
@@ -517,24 +507,26 @@ async def get_news():
                 logger.error(f"{name} failed: {e}")
                 results[name] = []
 
-    ij  = results.get("scrape_insurance_journal", [])
-    bi  = results.get("scrape_business_insurance", [])
-    cm  = results.get("scrape_carrier_management", [])
-    cj  = results.get("scrape_claims_journal", [])
-    ibm = results.get("scrape_insurance_business_mag", [])
+    ij   = results.get("scrape_insurance_journal", [])
+    bi   = results.get("scrape_business_insurance", [])
+    cm   = results.get("scrape_carrier_management", [])
+    cj   = results.get("scrape_claims_journal", [])
+    ibm  = results.get("scrape_insurance_business_mag", [])
+    pc   = results.get("scrape_property_casualty_360", [])
+    ri   = results.get("scrape_risk_and_insurance", [])
 
-    all_articles = ij + bi + cm + cj + ibm
+    all_articles = ij + bi + cm + cj + ibm + pc + ri
 
-    # Drop articles older than 14 days (uses URL date if no text date available)
+    # Drop articles older than 14 days
     def is_fresh(a):
         dt = best_date(a)
         if dt is None:
-            return True  # truly no date signal — keep but will be penalised in scoring
+            return True
         return (datetime.utcnow() - dt).days <= 14
 
     all_articles = [a for a in all_articles if is_fresh(a)]
 
-    # Score + pick top 10 before enriching (avoids fetching pages we discard)
+    # Score + pick top 10 before enriching
     top_10 = score_and_rank(all_articles)
 
     # Fetch summaries in parallel for articles that don't have one
@@ -544,12 +536,14 @@ async def get_news():
         "articles": top_10,
         "fetched_at": datetime.utcnow().isoformat() + "Z",
         "stats": {
-            "total_scraped": len(all_articles),
-            "insurance_journal": len(ij),
-            "business_insurance": len(bi),
-            "carrier_management": len(cm),
-            "claims_journal": len(cj),
+            "total_scraped":        len(all_articles),
+            "insurance_journal":    len(ij),
+            "business_insurance":   len(bi),
+            "carrier_management":   len(cm),
+            "claims_journal":       len(cj),
             "insurance_business_mag": len(ibm),
+            "property_casualty_360": len(pc),
+            "risk_and_insurance":   len(ri),
         },
     }
 
