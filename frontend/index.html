@@ -973,35 +973,57 @@
 
     const filtered = activeCat !== "All";
 
-    // Hero — only shown on All view
     if (filtered) {
+      // ── FILTERED VIEW: uniform list, no hero, no grid ──
       $("hero-wrap").innerHTML = "";
-    } else {
-      const h = articles[0];
-      $("hero-wrap").innerHTML = `
-        <a class="hero-card" href="${esc(h.url)}" target="_blank" rel="noopener">
-          <div class="hero-top">
-            <span class="hero-badge">Top Story</span>
-            <span class="hero-src">${esc(h.source)}</span>
-            <span class="hero-top-right time-str">${timeAgo(h.date)}</span>
-          </div>
-          <div class="hero-title">${esc(h.title)}</div>
-          <div class="hero-summary">${esc(h.summary) || "Click to read the full article."}</div>
-          <div class="hero-foot">
-            <div class="hero-cats" id="a-cats-0">${pendingTagsHtml()}</div>
-            <span class="hero-cta">Read full article →</span>
-          </div>
-        </a>`;
+      $("grid-wrap").style.display = "none";
+      $("brief-wrap").style.display = "";
+      $("brief-list").innerHTML = articles.map((a, i) => {
+        const col = srcColor(a.source);
+        const num = String(i + 1).padStart(2, "0");
+        return `
+          <a class="brief-row" href="${esc(a.url)}" target="_blank" rel="noopener">
+            <span class="brief-num">${num}</span>
+            <span class="src-dot" style="background:${col}"></span>
+            <div class="brief-center">
+              <div class="brief-title">${esc(a.title)}</div>
+              <div class="brief-meta" id="f-cats-${i}">
+                <span class="brief-src">${esc(a.source)}</span>
+                ${pendingTagsHtml()}
+              </div>
+            </div>
+            <div class="brief-right">
+              <span class="time-str">${timeAgo(a.date)}</span>
+              <span class="brief-arr">→</span>
+            </div>
+          </a>`;
+      }).join("");
+      return;
     }
 
-    // Grid — starts at 1 on All view, 0 on filtered view
-    const gridStart = filtered ? 0 : 1;
-    const gridArts = articles.slice(gridStart, gridStart + 4);
+    // ── ALL VIEW: hero + grid + briefing ──
+    const h = articles[0];
+    $("hero-wrap").innerHTML = `
+      <a class="hero-card" href="${esc(h.url)}" target="_blank" rel="noopener">
+        <div class="hero-top">
+          <span class="hero-badge">Top Story</span>
+          <span class="hero-src">${esc(h.source)}</span>
+          <span class="hero-top-right time-str">${timeAgo(h.date)}</span>
+        </div>
+        <div class="hero-title">${esc(h.title)}</div>
+        <div class="hero-summary">${esc(h.summary) || "Click to read the full article."}</div>
+        <div class="hero-foot">
+          <div class="hero-cats" id="a-cats-0">${pendingTagsHtml()}</div>
+          <span class="hero-cta">Read full article →</span>
+        </div>
+      </a>`;
+
+    // Grid (articles 1–4)
+    const gridArts = articles.slice(1, 5);
     if (gridArts.length) {
       $("story-grid").innerHTML = gridArts.map((a, i) => {
         const cc = srcCardClass(a.source);
         const col = srcColor(a.source);
-        const catId = filtered ? `f-cats-${i}` : `a-cats-${i + 1}`;
         return `
           <a class="story-card ${cc}" href="${esc(a.url)}" target="_blank" rel="noopener">
             <div class="story-top">
@@ -1011,7 +1033,7 @@
             </div>
             <div class="story-title">${esc(a.title)}</div>
             <div class="story-summary">${esc(a.summary) || ""}</div>
-            <div class="story-foot" id="${catId}">${pendingTagsHtml()}</div>
+            <div class="story-foot" id="a-cats-${i + 1}">${pendingTagsHtml()}</div>
           </a>`;
       }).join("");
       $("grid-wrap").style.display = "";
@@ -1019,21 +1041,19 @@
       $("grid-wrap").style.display = "none";
     }
 
-    // Briefing
-    const briefStart = gridStart + 4;
-    const briefArts = articles.slice(briefStart, briefStart + 5);
+    // Briefing (articles 5–9)
+    const briefArts = articles.slice(5, 10);
     if (briefArts.length) {
       $("brief-list").innerHTML = briefArts.map((a, i) => {
         const col = srcColor(a.source);
         const num = String(i + 1).padStart(2, "0");
-        const catId = filtered ? `f-cats-b-${i}` : `a-cats-${i + 5}`;
         return `
           <a class="brief-row" href="${esc(a.url)}" target="_blank" rel="noopener">
             <span class="brief-num">${num}</span>
             <span class="src-dot" style="background:${col}"></span>
             <div class="brief-center">
               <div class="brief-title">${esc(a.title)}</div>
-              <div class="brief-meta" id="${catId}">
+              <div class="brief-meta" id="a-cats-${i + 5}">
                 <span class="brief-src">${esc(a.source)}</span>
                 ${pendingTagsHtml()}
               </div>
