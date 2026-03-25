@@ -480,15 +480,15 @@ async def get_news():
 # ---------------------------------------------------------------------------
 
 CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "Property & Casualty": ["property","casualty","liability","home","fire","flood","theft","damage","p&c","dwelling","homeowner"],
-    "Reinsurance":         ["reinsurance","reinsurer","retrocession","treaty","facultative","swiss re","munich re","cedent","lloyd's"],
-    "Markets":             ["investment","acquisition","merger","premium","rate","pricing","revenue","profit","loss ratio","combined ratio","ipo"],
-    "Cyber":               ["cyber","ransomware","data breach","hack","malware","technology","digital"," ai ","cloud","phishing"],
-    "Climate & CAT":       ["climate","catastrophe"," cat ","flood","wildfire","hurricane","tornado","earthquake","storm","esg","net zero"],
-    "Life & Health":       ["life","health","medical","mortality","longevity","annuity","pension","benefit","wellness","mental health"],
-    "Regulatory":          ["naic","fca","regulatory","regulation","compliance","legislation","bill"," law ","ruling","mandate","solvency"],
-    "Commercial":          ["commercial","corporate","enterprise","workers compensation","employer","sme"],
-    "Motor":               ["motor","auto","vehicle"," car ","truck","fleet"," ev ","autonomous","telematics","road"],
+    "Property & Casualty": ["property insurance","casualty","homeowner","home insurance","liability insurance","fire damage","flood claim","dwelling","p&c","contents insurance","buildings insurance","personal lines","renters insurance"],
+    "Reinsurance":         ["reinsurance","reinsurer","retrocession","treaty","facultative","swiss re","munich re","hannover re","cedent","lloyd's","retrocessionaire","cession"],
+    "Markets":             ["acquisition","merger","ipo","loss ratio","combined ratio","underwriting profit","underwriting loss","rate hardening","rate softening","premium growth","capacity","investment return","quarterly results","annual results","market hardening"],
+    "Cyber":               ["cyber insurance","ransomware","data breach","cyber attack","cyber risk","cyber liability","technology insurance","cyber claim","phishing","malware","hacking"],
+    "Climate & CAT":       ["catastrophe","hurricane","wildfire","tornado","earthquake","typhoon","flood loss","storm damage","nat cat","climate risk","esg","climate change","extreme weather","severe convective"],
+    "Life & Health":       ["life insurance","health insurance","mortality","longevity","annuity","pension","life assurance","critical illness","income protection","employee benefit","group life","medical insurance","long-term care"],
+    "Regulatory":          ["naic","fca","pra","eiopa","regulation","compliance","legislation","solvency ii","ifrs 17","insurance bill","regulatory","enforcement","licensing","government","congress","senate"],
+    "Commercial":          ["commercial insurance","workers compensation","employers liability","professional indemnity","directors and officers","d&o","public liability","commercial property","sme","trade credit","surety"],
+    "Motor":               ["motor insurance","auto insurance","car insurance","fleet insurance","telematics","electric vehicle insurance","autonomous vehicle","van insurance","road risk","motor claim","auto claim"],
 }
 
 def keyword_categorise(articles: List[Dict]) -> List[Dict]:
@@ -504,15 +504,24 @@ def ai_categorise(articles: List[Dict], api_key: str) -> List[Dict]:
     client = anthropic.Anthropic(api_key=api_key)
     articles_json = json.dumps([{"id": a["id"], "title": a["title"], "summary": a["summary"]} for a in articles])
     prompt = (
-        "You are an insurance industry expert. Categorise each article into one or more of these exact categories:\n"
-        "Property & Casualty, Reinsurance, Markets, Cyber, Climate & CAT, Life & Health, Regulatory, Commercial, Motor\n\n"
+        "You are a senior insurance industry analyst. Categorise each article into one or more of these exact categories:\n\n"
+        "Property & Casualty — home, commercial property, liability, fire, flood, theft, personal lines, P&C\n"
+        "Reinsurance — treaty/facultative reinsurance, retrocession, cedents, Swiss Re, Munich Re, Lloyd's\n"
+        "Markets — M&A, IPOs, rate changes, combined ratios, underwriting results, capacity, investment returns, financial results\n"
+        "Cyber — ransomware, data breach, cyber insurance products, cyber attack, technology liability\n"
+        "Climate & CAT — natural catastrophes, hurricanes, wildfires, floods, earthquakes, nat cat, climate risk, ESG\n"
+        "Life & Health — life insurance, health insurance, mortality, longevity, annuities, pensions, employee benefits\n"
+        "Regulatory — NAIC, FCA, PRA, legislation, compliance, solvency, government policy, insurance bills\n"
+        "Commercial — commercial lines, workers comp, professional indemnity, D&O, SME, trade credit, surety\n"
+        "Motor — motor/auto insurance, telematics, EV insurance, fleet, autonomous vehicles\n\n"
         "Rules:\n"
-        "- Each article MUST have at least one category\n"
-        "- Each article can have multiple categories if genuinely relevant\n"
-        "- Be precise — only assign categories that clearly match\n"
-        "- Return ONLY valid JSON, no explanation, no markdown\n\n"
+        "- Assign only categories that clearly and directly match the article content\n"
+        "- Most articles should have 1-2 categories maximum\n"
+        "- Do NOT assign Markets unless the article is specifically about financial results, M&A, or rate movements\n"
+        "- Do NOT default to Markets — if nothing fits well, use the closest single category\n"
+        "- Return ONLY valid JSON array, no explanation, no markdown\n\n"
         f"Articles: {articles_json}\n\n"
-        'Return format: [{"id": 0, "categories": ["Markets", "Reinsurance"]}, ...]'
+        'Return format: [{"id": 0, "categories": ["Cyber"]}, ...]'
     )
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
