@@ -221,22 +221,83 @@ def build_fallback(articles: list) -> dict:
     }
 
 
+# ── Supabase snapshot helpers ────────────────────────────────────────────────
+
+def _sb_headers() -> dict:
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    return {
+        "apikey":        key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type":  "application/json",
+        "Prefer":        "resolution=merge-duplicates,return=minimal",
+    }
+
+def _read_snapshot(table: str) -> Optional[dict]:
+    url  = os.environ.get("SUPABASE_URL", "")
+    key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not url or not key:
+        return None
+    try:
+        resp = requests.get(
+            f"{url}/rest/v1/{table}?select=data,fetched_at&id=eq.1",
+            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+            timeout=5,
+        )
+        if resp.ok:
+            rows = resp.json()
+            if rows:
+                return rows[0]
+    except Exception as e:
+        logger.warning(f"Supabase read failed ({table}): {e}")
+    return None
+
+def _write_snapshot(table: str, data: dict) -> None:
+    url = os.environ.get("SUPABASE_URL", "")
+    if not url or not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        return
+    try:
+        requests.post(
+            f"{url}/rest/v1/{table}",
+            headers=_sb_headers(),
+            json={"id": 1, "data": data, "fetched_at": datetime.utcnow().isoformat()},
+            timeout=5,
+        )
+        logger.info(f"Supabase snapshot written ({table})")
+    except Exception as e:
+        logger.warning(f"Supabase write failed ({table}): {e}")
+
+
 # ── Cache logic ─────────────────────────────────────────────────────────────
 
 def get_or_build_news(force_refresh: bool = False) -> dict:
     now = time.time()
+
+    # 1. Memory cache — fastest path
     if not force_refresh and _cache["data"] and (now - _cache["ts"]) < CACHE_TTL:
-        logger.info("Serving from cache")
+        logger.info("Serving news from memory cache")
         return _cache["data"]
 
+    # 2. Supabase snapshot — used on cold start / after restart
+    if not force_refresh and not _cache["data"]:
+        snapshot = _read_snapshot("news_snapshot")
+        if snapshot:
+            age = (datetime.utcnow() - dateutil_parser.parse(snapshot["fetched_at"])).total_seconds()
+            if age < CACHE_TTL:
+                logger.info(f"Serving news from Supabase snapshot (age {round(age)}s)")
+                _cache["data"] = snapshot["data"]
+                _cache["ts"]   = now - age
+                return snapshot["data"]
+
+    # 3. Fetch fresh from RSS + Claude
     articles = fetch_rss_articles()
-    result = call_claude_api(articles)
+    result   = call_claude_api(articles)
     if result is None:
         result = build_fallback(articles)
 
     result["fetched_at"] = datetime.utcnow().isoformat() + "Z"
     _cache["data"] = result
-    _cache["ts"] = now
+    _cache["ts"]   = now
+    _write_snapshot("news_snapshot", result)
     return result
 
 
@@ -449,11 +510,24 @@ def fetch_company_releases(company: dict) -> list:
 @app.get("/companies")
 async def get_companies(force_refresh: bool = Query(False)):
     now = time.time()
+
+    # 1. Memory cache
     if not force_refresh and _companies_cache["data"] and (now - _companies_cache["ts"]) < COMPANIES_CACHE_TTL:
-        logger.info("Serving companies from cache")
+        logger.info("Serving companies from memory cache")
         return _companies_cache["data"]
 
-    # Fetch all companies in parallel (max 4 at a time to avoid rate limits)
+    # 2. Supabase snapshot — used on cold start / after restart
+    if not force_refresh and not _companies_cache["data"]:
+        snapshot = _read_snapshot("company_snapshot")
+        if snapshot:
+            age = (datetime.utcnow() - dateutil_parser.parse(snapshot["fetched_at"])).total_seconds()
+            if age < COMPANIES_CACHE_TTL:
+                logger.info(f"Serving companies from Supabase snapshot (age {round(age)}s)")
+                _companies_cache["data"] = snapshot["data"]
+                _companies_cache["ts"]   = now - age
+                return snapshot["data"]
+
+    # 3. Fetch fresh — all companies in parallel
     loop = asyncio.get_event_loop()
     tasks = [
         loop.run_in_executor(None, fetch_company_releases, company)
@@ -480,6 +554,7 @@ async def get_companies(force_refresh: bool = Query(False)):
     response = {"companies": result, "fetched_at": datetime.utcnow().isoformat() + "Z"}
     _companies_cache["data"] = response
     _companies_cache["ts"]   = now
+    _write_snapshot("company_snapshot", response)
     return response
 
 
