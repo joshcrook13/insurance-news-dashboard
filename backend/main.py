@@ -298,20 +298,31 @@ def _write_news_db(result: dict) -> None:
     inserted = []
     if article_rows:
         try:
-            upsert_headers = {**h, "Prefer": "resolution=merge-duplicates,return=representation"}
             resp = requests.post(
                 f"{sb_url}/rest/v1/articles",
-                headers=upsert_headers,
+                headers=h,
                 json=article_rows,
                 timeout=10,
             )
             if resp.ok:
-                inserted = resp.json()
-                logger.info(f"Upserted {len(inserted)} articles to Supabase")
+                logger.info(f"Upserted {len(article_rows)} articles to Supabase")
             else:
                 logger.warning(f"Article upsert failed: {resp.status_code} {resp.text}")
         except Exception as e:
             logger.warning(f"Article upsert error: {e}")
+
+        # Fetch back today's articles with their UUIDs for company_mentions
+        try:
+            key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+            fetch = requests.get(
+                f"{sb_url}/rest/v1/articles?select=id,title,summary&briefing_date=eq.{today}",
+                headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                timeout=5,
+            )
+            if fetch.ok:
+                inserted = fetch.json()
+        except Exception as e:
+            logger.warning(f"Article fetch-back failed: {e}")
 
     # Upsert daily briefing
     try:
@@ -337,11 +348,11 @@ def _write_news_db(result: dict) -> None:
     mention_rows = []
     for row in inserted:
         article_id = row.get("id")
-        title      = row.get("title", "")
+        text       = (row.get("title", "") + " " + (row.get("summary") or "")).lower()
         if not article_id:
             continue
         for name in company_names:
-            if name.lower() in title.lower():
+            if name.lower() in text:
                 mention_rows.append({"article_id": article_id, "company": name})
     if mention_rows:
         try:
