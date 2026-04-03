@@ -232,39 +232,206 @@ def _sb_headers() -> dict:
         "Prefer":        "resolution=merge-duplicates,return=minimal",
     }
 
-def _read_snapshot(table: str) -> Optional[dict]:
-    url  = os.environ.get("SUPABASE_URL", "")
-    key  = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    if not url or not key:
+def _read_news_db() -> Optional[dict]:
+    sb_url = os.environ.get("SUPABASE_URL", "")
+    key    = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not sb_url or not key:
         return None
+    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    today   = datetime.utcnow().date().isoformat()
     try:
-        resp = requests.get(
-            f"{url}/rest/v1/{table}?select=data,fetched_at&id=eq.1",
-            headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        br = requests.get(
+            f"{sb_url}/rest/v1/daily_briefings"
+            f"?select=market_pulse,trending,generated_at,article_count"
+            f"&briefing_date=eq.{today}",
+            headers=headers, timeout=5,
+        )
+        if not br.ok or not br.json():
+            return None
+        briefing = br.json()[0]
+
+        ar = requests.get(
+            f"{sb_url}/rest/v1/articles"
+            f"?select=title,url,source,published,summary,consultant_angle,topic,significance"
+            f"&briefing_date=eq.{today}"
+            f"&order=significance.desc",
+            headers=headers, timeout=5,
+        )
+        if not ar.ok or not ar.json():
+            return None
+
+        return {
+            "market_pulse": briefing.get("market_pulse", ""),
+            "trending":     briefing.get("trending") or [],
+            "articles":     ar.json(),
+            "ai_processed": True,
+            "fetched_at":   briefing["generated_at"],
+        }
+    except Exception as e:
+        logger.warning(f"Supabase read_news_db failed: {e}")
+        return None
+
+
+def _write_news_db(result: dict) -> None:
+    sb_url = os.environ.get("SUPABASE_URL", "")
+    if not sb_url or not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        return
+    h     = _sb_headers()
+    today = datetime.utcnow().date().isoformat()
+    company_names = [c["name"] for c in COMPANIES]
+
+    # Upsert articles — use return=representation to get back UUIDs for company_mentions
+    article_rows = [
+        {
+            "title":            a.get("title", ""),
+            "url":              a.get("url", ""),
+            "source":           a.get("source", ""),
+            "published":        a.get("published") or None,
+            "summary":          a.get("summary"),
+            "consultant_angle": a.get("consultant_angle"),
+            "topic":            a.get("topic"),
+            "significance":     a.get("significance"),
+            "briefing_date":    today,
+        }
+        for a in result.get("articles", [])
+    ]
+    inserted = []
+    if article_rows:
+        try:
+            upsert_headers = {**h, "Prefer": "resolution=merge-duplicates,return=representation"}
+            resp = requests.post(
+                f"{sb_url}/rest/v1/articles",
+                headers=upsert_headers,
+                json=article_rows,
+                timeout=10,
+            )
+            if resp.ok:
+                inserted = resp.json()
+                logger.info(f"Upserted {len(inserted)} articles to Supabase")
+            else:
+                logger.warning(f"Article upsert failed: {resp.status_code} {resp.text}")
+        except Exception as e:
+            logger.warning(f"Article upsert error: {e}")
+
+    # Upsert daily briefing
+    try:
+        requests.post(
+            f"{sb_url}/rest/v1/daily_briefings",
+            headers=h,
+            json={
+                "briefing_date": today,
+                "market_pulse":  result.get("market_pulse", ""),
+                "trending":      result.get("trending", []),
+                "generated_at":  result.get("fetched_at", datetime.utcnow().isoformat()),
+                "article_count": len(article_rows),
+            },
             timeout=5,
         )
-        if resp.ok:
-            rows = resp.json()
-            if rows:
-                return rows[0]
+        logger.info("Upserted daily_briefings row")
     except Exception as e:
-        logger.warning(f"Supabase read failed ({table}): {e}")
-    return None
+        logger.warning(f"daily_briefings upsert error: {e}")
 
-def _write_snapshot(table: str, data: dict) -> None:
-    url = os.environ.get("SUPABASE_URL", "")
-    if not url or not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+    # Best-effort company_mentions
+    if not inserted:
+        return
+    mention_rows = []
+    for row in inserted:
+        article_id = row.get("id")
+        title      = row.get("title", "")
+        if not article_id:
+            continue
+        for name in company_names:
+            if name.lower() in title.lower():
+                mention_rows.append({"article_id": article_id, "company": name})
+    if mention_rows:
+        try:
+            requests.post(
+                f"{sb_url}/rest/v1/company_mentions",
+                headers=h,
+                json=mention_rows,
+                timeout=5,
+            )
+        except Exception as e:
+            logger.warning(f"company_mentions insert error: {e}")
+
+
+def _read_companies_db() -> Optional[dict]:
+    sb_url = os.environ.get("SUPABASE_URL", "")
+    key    = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not sb_url or not key:
+        return None
+    headers = {"apikey": key, "Authorization": f"Bearer {key}"}
+    try:
+        resp = requests.get(
+            f"{sb_url}/rest/v1/press_releases"
+            f"?select=company,title,url,published,summary,fetched_at"
+            f"&order=fetched_at.desc",
+            headers=headers, timeout=5,
+        )
+        if not resp.ok or not resp.json():
+            return None
+        rows = resp.json()
+
+        by_company: dict = {}
+        for row in rows:
+            by_company.setdefault(row["company"], []).append({
+                "title":     row["title"],
+                "url":       row["url"],
+                "published": row["published"],
+                "summary":   row["summary"],
+            })
+
+        result = []
+        for c in COMPANIES:
+            releases = by_company.get(c["name"], [])
+            result.append({
+                "name":          c["name"],
+                "initials":      c["initials"],
+                "color":         c["color"],
+                "type":          c["type"],
+                "url":           c["url"],
+                "releases":      releases,
+                "release_count": len(releases),
+                "last_updated":  releases[0]["published"] if releases else None,
+            })
+
+        return {"companies": result, "fetched_at": rows[0]["fetched_at"]}
+    except Exception as e:
+        logger.warning(f"Supabase read_companies_db failed: {e}")
+        return None
+
+
+def _write_companies_db(response: dict) -> None:
+    sb_url = os.environ.get("SUPABASE_URL", "")
+    if not sb_url or not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        return
+    now  = datetime.utcnow().isoformat()
+    rows = []
+    for company in response.get("companies", []):
+        for r in company.get("releases", []):
+            url = r.get("url", "").strip()
+            if not url:
+                continue
+            rows.append({
+                "company":    company["name"],
+                "title":      r.get("title", ""),
+                "url":        url,
+                "published":  r.get("published") or None,
+                "fetched_at": now,
+                "summary":    r.get("summary"),
+            })
+    if not rows:
         return
     try:
         requests.post(
-            f"{url}/rest/v1/{table}",
+            f"{sb_url}/rest/v1/press_releases",
             headers=_sb_headers(),
-            json={"id": 1, "data": data, "fetched_at": datetime.utcnow().isoformat()},
-            timeout=5,
+            json=rows,
+            timeout=10,
         )
-        logger.info(f"Supabase snapshot written ({table})")
+        logger.info(f"Upserted {len(rows)} press releases to Supabase")
     except Exception as e:
-        logger.warning(f"Supabase write failed ({table}): {e}")
+        logger.warning(f"press_releases upsert error: {e}")
 
 
 # ── Cache logic ─────────────────────────────────────────────────────────────
@@ -277,16 +444,16 @@ def get_or_build_news(force_refresh: bool = False) -> dict:
         logger.info("Serving news from memory cache")
         return _cache["data"]
 
-    # 2. Supabase snapshot — used on cold start / after restart
+    # 2. Supabase DB — used on cold start / after restart
     if not force_refresh and not _cache["data"]:
-        snapshot = _read_snapshot("news_snapshot")
+        snapshot = _read_news_db()
         if snapshot:
             age = (datetime.utcnow() - dateutil_parser.parse(snapshot["fetched_at"])).total_seconds()
             if age < CACHE_TTL:
-                logger.info(f"Serving news from Supabase snapshot (age {round(age)}s)")
-                _cache["data"] = snapshot["data"]
+                logger.info(f"Serving news from Supabase DB (age {round(age)}s)")
+                _cache["data"] = snapshot
                 _cache["ts"]   = now - age
-                return snapshot["data"]
+                return snapshot
 
     # 3. Fetch fresh from RSS + Claude
     articles = fetch_rss_articles()
@@ -297,7 +464,7 @@ def get_or_build_news(force_refresh: bool = False) -> dict:
     result["fetched_at"] = datetime.utcnow().isoformat() + "Z"
     _cache["data"] = result
     _cache["ts"]   = now
-    _write_snapshot("news_snapshot", result)
+    _write_news_db(result)
     return result
 
 
@@ -516,16 +683,16 @@ async def get_companies(force_refresh: bool = Query(False)):
         logger.info("Serving companies from memory cache")
         return _companies_cache["data"]
 
-    # 2. Supabase snapshot — used on cold start / after restart
+    # 2. Supabase DB — used on cold start / after restart
     if not force_refresh and not _companies_cache["data"]:
-        snapshot = _read_snapshot("company_snapshot")
+        snapshot = _read_companies_db()
         if snapshot:
             age = (datetime.utcnow() - dateutil_parser.parse(snapshot["fetched_at"])).total_seconds()
             if age < COMPANIES_CACHE_TTL:
-                logger.info(f"Serving companies from Supabase snapshot (age {round(age)}s)")
-                _companies_cache["data"] = snapshot["data"]
+                logger.info(f"Serving companies from Supabase DB (age {round(age)}s)")
+                _companies_cache["data"] = snapshot
                 _companies_cache["ts"]   = now - age
-                return snapshot["data"]
+                return snapshot
 
     # 3. Fetch fresh — all companies in parallel
     loop = asyncio.get_event_loop()
@@ -554,7 +721,7 @@ async def get_companies(force_refresh: bool = Query(False)):
     response = {"companies": result, "fetched_at": datetime.utcnow().isoformat() + "Z"}
     _companies_cache["data"] = response
     _companies_cache["ts"]   = now
-    _write_snapshot("company_snapshot", response)
+    _write_companies_db(response)
     return response
 
 
