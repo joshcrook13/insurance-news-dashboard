@@ -705,13 +705,27 @@ async def get_companies(force_refresh: bool = Query(False)):
                 _companies_cache["ts"]   = now - age
                 return snapshot
 
-    # 3. Fetch fresh — all companies in parallel
+    # 3. Fetch fresh — RSS companies in parallel, Claude companies sequentially
+    rss_companies    = [c for c in COMPANIES if c.get("rss_urls")]
+    claude_companies = [c for c in COMPANIES if not c.get("rss_urls")]
+
     loop = asyncio.get_event_loop()
-    tasks = [
-        loop.run_in_executor(None, fetch_company_releases, company)
-        for company in COMPANIES
-    ]
-    releases_list = await asyncio.gather(*tasks, return_exceptions=True)
+    rss_tasks = [loop.run_in_executor(None, fetch_company_releases, c) for c in rss_companies]
+    rss_results = await asyncio.gather(*rss_tasks, return_exceptions=True)
+
+    claude_results = []
+    for c in claude_companies:
+        try:
+            claude_results.append(fetch_company_releases(c))
+        except Exception as e:
+            logger.error(f"Exception for {c['name']}: {e}")
+            claude_results.append([])
+        await asyncio.sleep(1)
+
+    # Reassemble in original COMPANIES order
+    rss_map    = {c["name"]: r for c, r in zip(rss_companies, rss_results)}
+    claude_map = {c["name"]: r for c, r in zip(claude_companies, claude_results)}
+    releases_list = [rss_map.get(c["name"], claude_map.get(c["name"], [])) for c in COMPANIES]
 
     result = []
     for company, releases in zip(COMPANIES, releases_list):
