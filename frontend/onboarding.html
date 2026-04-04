@@ -147,7 +147,7 @@ body {
   <div class="wizard">
 
     <div class="progress-row">
-      <div class="progress-step"><div class="progress-fill" id="prog" style="width:16%"></div></div>
+      <div class="progress-step"><div class="progress-fill" id="prog" style="width:0%"></div></div>
       <span class="progress-label" id="prog-label">Step 1 of 5</span>
     </div>
 
@@ -185,7 +185,7 @@ body {
       </div>
       <div class="nav-row">
         <span></span>
-        <button class="btn-next" onclick="goNext(1)">Continue →</button>
+        <button class="btn-next" id="step1-next" disabled onclick="goNext(1)">Continue →</button>
       </div>
     </div>
 
@@ -235,7 +235,7 @@ body {
       </div>
       <div class="nav-row">
         <button class="btn-back" onclick="goBack(2)">← Back</button>
-        <button class="btn-next" onclick="goNext(2)">Continue →</button>
+        <button class="btn-next" id="step2-next" disabled onclick="goNext(2)">Continue →</button>
       </div>
     </div>
 
@@ -345,12 +345,50 @@ const SUPABASE_URL      = 'https://ogpfdrpoujrekgbrfilk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncGZkcnBvdWpyZWtnYnJmaWxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTQxODksImV4cCI6MjA4OTk3MDE4OX0.dcE_FaWQEMlYorjj0S9M5jIGCV5U2nobmc5D0RFnApM';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ── Auth guard + skip if already onboarded ─────────────────────────────────
+// ── Auth guard — pre-fill if editing existing prefs ───────────────────────
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.replace('login.html'); return; }
-  const { data: prefs } = await sb.from('user_preferences').select('user_id').eq('user_id', session.user.id).single();
-  if (prefs) { window.location.replace('index.html'); }
+  const { data: prefs } = await sb.from('user_preferences').select('*').eq('user_id', session.user.id).single();
+  if (prefs) {
+    // Pre-fill selections so the user sees their existing choices
+    if (prefs.role) {
+      selections.role = prefs.role;
+      document.querySelectorAll('#step-1 .option-card').forEach(c => {
+        if (c.querySelector('.option-label')?.textContent.trim() === prefs.role) {
+          c.classList.add('selected');
+          document.getElementById('step1-next').disabled = false;
+        }
+      });
+    }
+    if (prefs.specialism) {
+      selections.spec = prefs.specialism;
+      document.querySelectorAll('#step-2 .option-card').forEach(c => {
+        if (c.querySelector('.option-label')?.textContent.trim() === prefs.specialism) {
+          c.classList.add('selected');
+          document.getElementById('step2-next').disabled = false;
+        }
+      });
+    }
+    if (prefs.topics?.length) {
+      selections.topics = prefs.topics;
+      document.querySelectorAll('#step-3 .topic-chip').forEach(c => {
+        if (prefs.topics.includes(c.dataset.value)) c.classList.add('selected');
+      });
+    }
+    if (prefs.watchlist_companies?.length) {
+      selections.companies = prefs.watchlist_companies;
+      document.querySelectorAll('#step-4 .company-card').forEach(c => {
+        if (prefs.watchlist_companies.includes(c.dataset.name)) c.classList.add('selected');
+      });
+    }
+    if (prefs.digest_time) {
+      selections.time = prefs.digest_time;
+      document.querySelectorAll('.time-card').forEach(c => {
+        c.classList.toggle('selected', c.dataset.value === prefs.digest_time);
+      });
+    }
+  }
 })();
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -382,7 +420,8 @@ function goNext(fromStep) {
   if (nextEl) {
     nextEl.classList.add('active');
     currentStep = next;
-    updateProgress(next);
+    // Progress reflects steps *completed*, not current step number
+    updateProgress(fromStep);
     window.scrollTo(0, 0);
   }
 }
@@ -392,7 +431,7 @@ function goBack(fromStep) {
   document.getElementById('step-' + fromStep).classList.remove('active');
   document.getElementById('step-' + prev).classList.add('active');
   currentStep = prev;
-  updateProgress(prev);
+  updateProgress(prev - 1);
   window.scrollTo(0, 0);
 }
 
@@ -401,6 +440,9 @@ function selectSingle(card, key) {
   card.parentElement.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
   card.classList.add('selected');
   selections[key] = card.querySelector('.option-label').textContent.trim();
+  const btnMap = { role: 'step1-next', spec: 'step2-next' };
+  const btn = document.getElementById(btnMap[key]);
+  if (btn) btn.disabled = false;
 }
 
 function toggleChip(chip) {
@@ -480,7 +522,7 @@ async function saveAndFinish() {
   setTimeout(() => window.location.replace('index.html'), 2200);
 }
 
-updateProgress(1);
+document.getElementById('prog-label').textContent = 'Step 1 of 5';
 </script>
 </body>
 </html>

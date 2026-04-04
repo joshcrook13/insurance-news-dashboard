@@ -212,6 +212,7 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
   <div class="masthead-right">
     <div class="live-indicator"><div class="live-dot"></div>LIVE</div>
     <div id="admin-link" style="display:none"><a href="admin.html" class="masthead-link">Admin</a></div>
+    <a href="onboarding.html" class="masthead-link">⚙ Preferences</a>
     <div class="user-pill" onclick="signOut()">
       <div class="user-avatar" id="user-initials">?</div>
       <span id="user-email">—</span>
@@ -246,7 +247,7 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
     <!-- LOADING -->
     <div class="state-box" id="state-loading">
       <div class="spinner"></div>
-      <div class="state-label">Fetching today's briefing…</div>
+      <div class="state-label" id="loading-label">Fetching today's briefing…</div>
     </div>
 
     <!-- ERROR -->
@@ -266,6 +267,8 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
         </div>
         <div class="pulse-text" id="pulse-text"></div>
       </div>
+
+      <div id="quiet-day-note" style="display:none; font-family:'Crimson Pro',serif; font-size:14px; color:var(--ink-muted); padding:10px 14px; background:var(--paper-warm); border-left:3px solid var(--rule); margin-bottom:16px; line-height:1.55;">Quieter day in the market — showing the most significant stories from the last 48 hours.</div>
 
       <div class="trending-section" id="trending-section" style="display:none">
         <span class="trending-label">Trending</span>
@@ -297,7 +300,10 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
     <div class="agent-widget">
       <div class="agent-header">
         <span class="agent-title">Intelligence Agent</span>
-        <span class="agent-model">Claude Haiku · Web search</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="agent-model">Claude Haiku · Web search</span>
+          <button onclick="clearAgent()" title="Clear conversation" style="background:none;border:none;color:rgba(253,248,240,0.3);cursor:pointer;font-size:13px;padding:0;line-height:1;" onmouseover="this.style.color='rgba(253,248,240,0.7)'" onmouseout="this.style.color='rgba(253,248,240,0.3)'">↺</button>
+        </div>
       </div>
       <div class="agent-messages" id="agent-messages">
         <div class="msg agent">
@@ -419,6 +425,18 @@ function showToast(msg) {
   setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
+// ── FILTER PILLS ──────────────────────────────────────────────────────────
+function updateFilterPills() {
+  const activeTopic = new Set(allArticles.map(a => a.topic));
+  document.querySelectorAll('.filter-pill').forEach(p => {
+    if (p.dataset.topic === 'All') return;
+    const has = activeTopic.has(p.dataset.topic);
+    p.style.opacity  = has ? '' : '0.35';
+    p.style.cursor   = has ? '' : 'default';
+    p.style.pointerEvents = has ? '' : 'none';
+  });
+}
+
 // ── PREFERENCES ───────────────────────────────────────────────────────────
 function sortByPreferences(articles) {
   if (!userPrefs?.topics?.length) return articles;
@@ -447,7 +465,7 @@ function setState(name) {
 function renderArticles(articles) {
   const saved = getSaved();
   if (!articles.length) {
-    $('articles-list').innerHTML = `<div class="co-empty" style="padding:24px 0">No articles match this filter.</div>`;
+    $('articles-list').innerHTML = `<div class="co-empty" style="padding:24px 0; font-family:'Crimson Pro',serif; font-size:15px; color:var(--ink-muted);">No ${currentFilter} articles in today's briefing. Try a different topic or check back later.</div>`;
     return;
   }
   $('articles-list').innerHTML = articles.map((a, i) => {
@@ -508,7 +526,15 @@ async function loadNews(force=false) {
     if (force && userPrefs?.role)       url += `&role=${encodeURIComponent(userPrefs.role)}`;
     if (force && userPrefs?.specialism) url += `&specialism=${encodeURIComponent(userPrefs.specialism)}`;
     const ctrl = new AbortController();
-    setTimeout(()=>ctrl.abort(), 55000);
+    const loadingMsgs = [
+      [8000,  'Scanning RSS feeds across 6 sources…'],
+      [20000, 'Analysing with Claude Haiku — almost there…'],
+      [40000, 'Taking a little longer than usual, nearly done…'],
+    ];
+    const loadingTimers = loadingMsgs.map(([ms, msg]) =>
+      setTimeout(() => { if ($('loading-label')) $('loading-label').textContent = msg; }, ms)
+    );
+    setTimeout(()=>ctrl.abort(), 90000);
     const resp = await fetch(url, {signal:ctrl.signal});
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
@@ -532,6 +558,8 @@ async function loadNews(force=false) {
       $('trending-section').style.display = 'none';
     }
 
+    $('quiet-day-note').style.display = allArticles.length < 5 ? '' : 'none';
+    updateFilterPills();
     applyFilter('All');
     renderHighSig();
     setState('content');
@@ -540,6 +568,8 @@ async function loadNews(force=false) {
     console.error(e);
     setState('error');
   } finally {
+    loadingTimers.forEach(clearTimeout);
+    if ($('loading-label')) $('loading-label').textContent = 'Fetching today\'s briefing…';
     $('refresh-btn').disabled = false;
     $('refresh-icon').classList.remove('spin');
   }
@@ -678,6 +708,10 @@ function updateAgentSuggestions(data) {
   $('agent-chips').innerHTML = chips.slice(0, 5).map(c =>
     `<button class="suggestion" onclick="setQuery(this)" data-query="${esc(c.query)}">${esc(c.label)}</button>`
   ).join('');
+}
+
+function clearAgent() {
+  $('agent-messages').innerHTML = '<div class="msg agent"><div class="msg-bubble">Cleared. What would you like to explore?</div></div>';
 }
 
 function setAgentLoading(on) {
