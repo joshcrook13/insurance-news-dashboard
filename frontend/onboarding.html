@@ -450,6 +450,15 @@ async function saveAndFinish() {
   });
 
   if (error) {
+    console.error('Supabase upsert error:', error);
+    const msg = error.message || error.details || JSON.stringify(error);
+    if (msg.includes('relation') || msg.includes('does not exist')) {
+      errEl.textContent = 'Setup required: run the user_preferences SQL migration in Supabase first.';
+    } else if (msg.includes('RLS') || msg.includes('policy') || msg.includes('permission') || msg.includes('violates')) {
+      errEl.textContent = 'Permission error — check Supabase RLS policies for user_preferences.';
+    } else {
+      errEl.textContent = `Save failed: ${msg}`;
+    }
     errEl.style.display = 'block';
     btn.disabled = false;
     btn.textContent = 'Save & Open Briefing →';
