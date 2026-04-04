@@ -5,7 +5,7 @@ import feedparser
 import anthropic
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil import parser as dateutil_parser
 import os
 import json
@@ -54,6 +54,7 @@ Rules:
 - Exclude press releases disguised as news
 - Select the top 8 most significant articles for a senior
   insurance consultant to read today
+- Strongly prefer articles published in the last 24 hours
 - Rank them by importance and market significance
 - For each selected article write:
   * A one sentence summary (max 20 words, plain English)
@@ -100,11 +101,13 @@ Articles to analyse:
 # ── RSS fetching ────────────────────────────────────────────────────────────
 
 def fetch_rss_articles() -> list:
-    """Fetch up to 20 articles from each RSS feed, return all sorted by date desc."""
+    """Fetch up to 20 articles per feed published within the last 48 hours, sorted by date desc."""
     articles = []
+    cutoff   = datetime.utcnow() - timedelta(hours=48)
+
     for source_name, feed_url in RSS_FEEDS:
         try:
-            feed = feedparser.parse(feed_url)
+            feed  = feedparser.parse(feed_url)
             count = 0
             for entry in feed.entries:
                 if count >= 20:
@@ -115,15 +118,21 @@ def fetch_rss_articles() -> list:
                     continue
 
                 # Parse date — try published then updated
-                pub_date = ""
+                pub_date    = ""
+                pub_dt      = None
                 for attr in ("published", "updated"):
                     raw = entry.get(attr, "")
                     if raw:
                         try:
-                            pub_date = dateutil_parser.parse(raw).isoformat()
+                            pub_dt   = dateutil_parser.parse(raw).replace(tzinfo=None)
+                            pub_date = pub_dt.isoformat()
                         except Exception:
                             pub_date = raw
                         break
+
+                # Drop articles older than 48 hours
+                if pub_dt and pub_dt < cutoff:
+                    continue
 
                 # Summary — strip HTML
                 summary = ""
@@ -154,7 +163,7 @@ def fetch_rss_articles() -> list:
             return datetime.min
 
     articles.sort(key=sort_key, reverse=True)
-    logger.info(f"Fetched {len(articles)} articles across {len(RSS_FEEDS)} feeds")
+    logger.info(f"Fetched {len(articles)} articles (last 48h) across {len(RSS_FEEDS)} feeds")
     return articles
 
 
