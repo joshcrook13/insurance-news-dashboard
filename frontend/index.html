@@ -255,7 +255,7 @@ body {
   transition: all 0.12s;
 }
 .retry-btn:hover { background: var(--ink); color: var(--paper); }
-.state-content { display: none; }
+.state-content { display: block; }
 
 /* ── MARKET PULSE CARD ── */
 .pulse-card {
@@ -968,7 +968,7 @@ function showToast(msg) {
 // ── STATES ────────────────────────────────────────────────────────────────
 function setState(name) {
   ['state-loading','state-error','state-content'].forEach(id => {
-    $(id).style.display = id === `state-${name}` ? '' : 'none';
+    $(id).style.display = id === `state-${name}` ? 'block' : 'none';
   });
 }
 
