@@ -76,9 +76,11 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
 .pulse-text { font-family:'Crimson Pro',serif; font-size:15.5px; line-height:1.65; color:var(--ink); }
 
 /* TRENDING */
-.trending-section { display:flex; align-items:center; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+.trending-section { display:flex; align-items:center; gap:8px; margin-bottom:20px; overflow:hidden; }
 .trending-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.1em; color:var(--ink-muted); text-transform:uppercase; white-space:nowrap; flex-shrink:0; }
-.trend-chip { font-family:'DM Mono',monospace; font-size:10px; padding:4px 11px; border:1px solid var(--rule); border-radius:100px; color:var(--ink-light); cursor:default; background:white; white-space:nowrap; }
+#trending-chips { display:flex; flex-direction:row; gap:6px; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:none; }
+#trending-chips::-webkit-scrollbar { display:none; }
+.trend-chip { font-family:'DM Mono',monospace; font-size:10px; padding:4px 11px; border:1px solid var(--rule); border-radius:100px; color:var(--ink-light); cursor:default; background:white; white-space:nowrap; flex-shrink:0; }
 
 /* SECTION HEAD */
 .section-head { display:flex; align-items:center; gap:10px; padding-bottom:9px; border-bottom:1.5px solid var(--ink); margin-bottom:0; }
