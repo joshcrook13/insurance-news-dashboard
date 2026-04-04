@@ -134,6 +134,8 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
 .action-btn { display:flex; align-items:center; gap:5px; font-family:'DM Mono',monospace; font-size:10px; padding:4px 10px; border:1px solid var(--rule); border-radius:3px; background:transparent; cursor:pointer; color:var(--ink-muted); transition:all 0.12s; }
 .action-btn:hover { border-color:var(--gold); color:var(--gold-dark); background:var(--gold-soft); }
 .action-btn.saved { border-color:var(--gold); color:var(--gold-dark); background:var(--gold-soft); }
+.watchlist-tag { font-family:'DM Mono',monospace; font-size:9px; padding:2px 7px; border:1px solid var(--gold); border-radius:2px; color:var(--gold-dark); background:var(--gold-soft); }
+.preferred-dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--gold); margin-right:4px; vertical-align:middle; }
 
 /* ── SIDEBAR ── */
 .sidebar { padding:20px 22px 40px; display:flex; flex-direction:column; }
@@ -351,6 +353,7 @@ const $  = id => document.getElementById(id);
 let allArticles   = [];
 let currentFilter = 'All';
 let sessionReads  = 0;
+let userPrefs     = null;
 
 // ── AUTH ──────────────────────────────────────────────────────────────────
 async function initAuth() {
@@ -364,6 +367,10 @@ async function initAuth() {
   if (profile?.role === 'admin') $('admin-link').style.display = '';
   sb.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', session.user.id).then(()=>{});
   sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') window.location.replace('login.html'); });
+  // Load preferences — redirect to onboarding if none exist
+  const { data: prefs } = await sb.from('user_preferences').select('*').eq('user_id', session.user.id).single();
+  if (!prefs) { window.location.replace('onboarding.html'); return false; }
+  userPrefs = prefs;
   return true;
 }
 
@@ -412,6 +419,23 @@ function showToast(msg) {
   setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
+// ── PREFERENCES ───────────────────────────────────────────────────────────
+function sortByPreferences(articles) {
+  if (!userPrefs?.topics?.length) return articles;
+  return [...articles].sort((a, b) => {
+    const aP = userPrefs.topics.includes(a.topic) ? 1 : 0;
+    const bP = userPrefs.topics.includes(b.topic) ? 1 : 0;
+    if (bP !== aP) return bP - aP;
+    return (b.significance || 0) - (a.significance || 0);
+  });
+}
+
+function watchlistMatches(article) {
+  if (!userPrefs?.watchlist_companies?.length) return [];
+  const text = ((article.title || '') + ' ' + (article.summary || '')).toLowerCase();
+  return userPrefs.watchlist_companies.filter(c => text.includes(c.toLowerCase()));
+}
+
 // ── STATES ────────────────────────────────────────────────────────────────
 function setState(name) {
   $('state-loading').style.display = name==='loading' ? 'flex' : 'none';
@@ -440,9 +464,10 @@ function renderArticles(articles) {
         <div class="art-meta-row">
           <span class="source-tag">${esc(a.source)}</span>
           <span class="meta-dot">·</span>
-          <span class="topic-tag ${topicClass(a.topic)}">${esc(a.topic)}</span>
+          <span class="topic-tag ${topicClass(a.topic)}">${userPrefs?.topics?.includes(a.topic) ? '<span class="preferred-dot"></span>' : ''}${esc(a.topic)}</span>
           <span class="meta-dot">·</span>
           <span class="sig-label ${sc}">● ${sigLabel(a.significance)}</span>
+          ${watchlistMatches(a).map(c=>`<span class="watchlist-tag">★ ${esc(c)}</span>`).join('')}
           ${timeAgo(a.published) ? `<span class="art-time">${timeAgo(a.published)}</span>` : ''}
         </div>
         <div class="art-headline" onclick="openArticle(${i})">${esc(a.title)}</div>
@@ -479,14 +504,16 @@ async function loadNews(force=false) {
   $('refresh-btn').disabled = true;
   $('refresh-icon').classList.add('spin');
   try {
-    const url = force ? `${API_BASE}/news?force_refresh=true` : `${API_BASE}/news`;
+    let url = force ? `${API_BASE}/news?force_refresh=true` : `${API_BASE}/news`;
+    if (force && userPrefs?.role)       url += `&role=${encodeURIComponent(userPrefs.role)}`;
+    if (force && userPrefs?.specialism) url += `&specialism=${encodeURIComponent(userPrefs.specialism)}`;
     const ctrl = new AbortController();
     setTimeout(()=>ctrl.abort(), 55000);
     const resp = await fetch(url, {signal:ctrl.signal});
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
 
-    allArticles = data.articles || [];
+    allArticles = sortByPreferences(data.articles || []);
     updateAgentSuggestions(data);
 
     if (data.market_pulse) {

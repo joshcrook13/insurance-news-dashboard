@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insurance Daily — Welcome</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --paper: #FDF8F0;
+  --paper-warm: #F7F0E3;
+  --ink: #1A1A1A;
+  --ink-light: #3D3D3A;
+  --ink-muted: #7A7870;
+  --rule: #DDD8CE;
+  --rule-light: #EDE8DF;
+  --gold: #C4922A;
+  --gold-soft: #FBF3E3;
+  --gold-dark: #9E7420;
+  --green: #2D6B45;
+  --green-soft: #E4F0EA;
+}
+html { font-size: 14px; }
+body {
+  font-family: 'Crimson Pro', Georgia, serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  border-top: 4px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 0 48px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--paper);
+}
+.brand { font-family:'Playfair Display',serif; font-size:22px; font-weight:800; letter-spacing:-0.5px; }
+.header-meta { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.08em; color:var(--ink-muted); text-transform:uppercase; }
+
+.wizard-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.wizard { width: 100%; max-width: 640px; }
+
+.progress-row { display:flex; align-items:center; gap:6px; margin-bottom:40px; }
+.progress-step { flex:1; height:3px; background:var(--rule); border-radius:2px; overflow:hidden; }
+.progress-fill { height:100%; background:var(--ink); border-radius:2px; transition:width 0.4s ease; }
+.progress-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.1em; color:var(--ink-muted); text-transform:uppercase; white-space:nowrap; margin-left:8px; }
+
+.step { display:none; animation:stepin 0.35s ease both; }
+.step.active { display:block; }
+@keyframes stepin { from{opacity:0;transform:translateX(18px)} to{opacity:1;transform:none} }
+
+.step-eyebrow { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dark); margin-bottom:10px; }
+.step-heading { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; line-height:1.25; margin-bottom:8px; color:var(--ink); }
+.step-sub { font-family:'Crimson Pro',serif; font-size:16px; color:var(--ink-muted); line-height:1.55; margin-bottom:32px; }
+
+.options-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:32px; }
+
+.option-card { border:1.5px solid var(--rule); border-radius:4px; padding:16px 18px; cursor:pointer; transition:all 0.15s; background:white; position:relative; }
+.option-card:hover { border-color:var(--ink); }
+.option-card.selected { border-color:var(--ink); background:var(--ink); color:var(--paper); }
+.option-card.selected .option-sub { color:rgba(253,248,240,0.55); }
+
+.option-check { position:absolute; top:12px; right:14px; width:16px; height:16px; border:1.5px solid var(--rule); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; color:transparent; transition:all 0.15s; }
+.option-card.selected .option-check { background:var(--gold); border-color:var(--gold); color:white; }
+
+.option-icon { font-size:22px; margin-bottom:8px; line-height:1; display:block; }
+.option-label { font-family:'Playfair Display',serif; font-size:15px; font-weight:600; margin-bottom:3px; }
+.option-sub { font-family:'Crimson Pro',serif; font-size:13px; color:var(--ink-muted); line-height:1.4; }
+
+.chips-grid { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:32px; }
+.topic-chip { display:flex; align-items:center; gap:7px; padding:8px 16px; border:1.5px solid var(--rule); border-radius:100px; cursor:pointer; background:white; font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.04em; color:var(--ink-light); transition:all 0.15s; }
+.topic-chip:hover { border-color:var(--ink); color:var(--ink); }
+.topic-chip.selected { background:var(--ink); border-color:var(--ink); color:var(--paper); }
+.chip-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+.company-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:32px; }
+.company-card { border:1.5px solid var(--rule); border-radius:4px; padding:14px 10px; cursor:pointer; text-align:center; background:white; transition:all 0.15s; position:relative; }
+.company-card:hover { border-color:var(--ink); }
+.company-card.selected { border-color:var(--gold); background:var(--gold-soft); }
+.company-card.selected .company-type { color:var(--gold-dark); }
+
+.co-ava { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'DM Mono',monospace; font-size:11px; font-weight:500; margin:0 auto 8px; }
+.company-name { font-family:'Crimson Pro',serif; font-size:13px; font-weight:500; margin-bottom:2px; }
+.company-type { font-family:'DM Mono',monospace; font-size:9px; color:var(--ink-muted); letter-spacing:0.04em; }
+.selected-tick { position:absolute; top:6px; right:8px; font-size:10px; color:var(--gold-dark); opacity:0; transition:opacity 0.15s; }
+.company-card.selected .selected-tick { opacity:1; }
+
+.time-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:32px; }
+.time-card { border:1.5px solid var(--rule); border-radius:4px; padding:20px 16px; cursor:pointer; text-align:center; background:white; transition:all 0.15s; }
+.time-card:hover { border-color:var(--ink); }
+.time-card.selected { border-color:var(--ink); background:var(--ink); color:var(--paper); }
+.time-card.selected .time-sub { color:rgba(253,248,240,0.55); }
+.time-icon { font-size:28px; margin-bottom:8px; display:block; }
+.time-label { font-family:'Playfair Display',serif; font-size:15px; font-weight:600; margin-bottom:4px; }
+.time-sub { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.05em; color:var(--ink-muted); }
+
+.done-screen { text-align:center; padding:20px 0; }
+.done-icon { font-size:48px; margin-bottom:20px; display:block; }
+.done-heading { font-family:'Playfair Display',serif; font-size:32px; font-weight:700; margin-bottom:10px; }
+.done-sub { font-family:'Crimson Pro',serif; font-size:17px; color:var(--ink-muted); line-height:1.6; margin-bottom:32px; }
+.done-summary { background:var(--gold-soft); border-left:4px solid var(--gold); padding:18px 20px; text-align:left; margin-bottom:32px; }
+.done-summary-label { font-family:'DM Mono',monospace; font-size:9px; letter-spacing:0.12em; color:var(--gold-dark); text-transform:uppercase; margin-bottom:10px; }
+.done-row { display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid rgba(196,146,42,0.2); }
+.done-row:last-child { border-bottom:none; }
+.done-row-label { font-family:'Crimson Pro',serif; font-size:14px; color:var(--ink-muted); }
+.done-row-val { font-family:'Crimson Pro',serif; font-size:14px; font-weight:500; color:var(--ink); max-width:280px; text-align:right; }
+
+.nav-row { display:flex; align-items:center; justify-content:space-between; }
+.btn-back { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.06em; color:var(--ink-muted); cursor:pointer; padding:10px 0; transition:all 0.12s; background:none; border:none; }
+.btn-back:hover { color:var(--ink); }
+.btn-next { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; background:var(--ink); color:var(--paper); border:none; padding:13px 32px; cursor:pointer; border-radius:3px; transition:background 0.15s; display:flex; align-items:center; gap:8px; }
+.btn-next:hover { background:#333; }
+.btn-next:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-next.gold { background:var(--gold); color:var(--ink); }
+.btn-next.gold:hover:not(:disabled) { background:var(--gold-dark); color:var(--paper); }
+.btn-skip { font-family:'DM Mono',monospace; font-size:10px; color:var(--ink-muted); cursor:pointer; background:none; border:none; border-bottom:1px solid var(--rule); padding-bottom:1px; }
+.btn-skip:hover { color:var(--ink); }
+
+.deco-rule { border:none; border-top:1px solid var(--rule); margin:0 0 28px; }
+
+.save-error { font-family:'DM Mono',monospace; font-size:11px; color:#B83228; margin-top:10px; display:none; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="brand">Insurance Daily</div>
+  <div class="header-meta">Intelligence for Insurance Professionals</div>
+</header>
+
+<div class="wizard-wrap">
+  <div class="wizard">
+
+    <div class="progress-row">
+      <div class="progress-step"><div class="progress-fill" id="prog" style="width:16%"></div></div>
+      <span class="progress-label" id="prog-label">Step 1 of 5</span>
+    </div>
+
+    <!-- STEP 1: ROLE -->
+    <div class="step active" id="step-1">
+      <div class="step-eyebrow">Getting started</div>
+      <div class="step-heading">What's your role?</div>
+      <div class="step-sub">This helps us calibrate the depth and framing of consulting angles to match how you think about the market.</div>
+      <hr class="deco-rule">
+      <div class="options-grid">
+        <div class="option-card" onclick="selectSingle(this,'role')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">🏛️</span>
+          <div class="option-label">Partner / Director</div>
+          <div class="option-sub">Strategic framing, client implications, market positioning</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'role')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">📊</span>
+          <div class="option-label">Manager / Senior Consultant</div>
+          <div class="option-sub">Tactical insights, deal dynamics, regulatory detail</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'role')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">🔬</span>
+          <div class="option-label">Analyst / Consultant</div>
+          <div class="option-sub">Data points, market evidence, technical depth</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'role')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">🏢</span>
+          <div class="option-label">Industry Professional</div>
+          <div class="option-sub">Practitioner perspective, operational context</div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <span></span>
+        <button class="btn-next" onclick="goNext(1)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: SPECIALISM -->
+    <div class="step" id="step-2">
+      <div class="step-eyebrow">Your expertise</div>
+      <div class="step-heading">What's your specialism?</div>
+      <div class="step-sub">We'll weight articles in your area more prominently and frame consulting angles through your discipline's lens.</div>
+      <hr class="deco-rule">
+      <div class="options-grid">
+        <div class="option-card" onclick="selectSingle(this,'spec')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">🔄</span>
+          <div class="option-label">Reinsurance</div>
+          <div class="option-sub">Treaty, facultative, ILS, cat modelling</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'spec')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">🤝</span>
+          <div class="option-label">Broking</div>
+          <div class="option-sub">Placement, distribution, client relationships</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'spec')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">📋</span>
+          <div class="option-label">Underwriting</div>
+          <div class="option-sub">Risk selection, pricing, portfolio management</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'spec')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">⚖️</span>
+          <div class="option-label">Claims</div>
+          <div class="option-sub">Claims handling, reserving, litigation trends</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'spec')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">📐</span>
+          <div class="option-label">Actuarial</div>
+          <div class="option-sub">Pricing, reserving, capital modelling</div>
+        </div>
+        <div class="option-card" onclick="selectSingle(this,'spec')">
+          <div class="option-check">✓</div>
+          <span class="option-icon">♟️</span>
+          <div class="option-label">Strategy &amp; M&amp;A</div>
+          <div class="option-sub">Corporate development, transactions, market entry</div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-back" onclick="goBack(2)">← Back</button>
+        <button class="btn-next" onclick="goNext(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: TOPICS -->
+    <div class="step" id="step-3">
+      <div class="step-eyebrow">Your briefing</div>
+      <div class="step-heading">Which topics matter most to you?</div>
+      <div class="step-sub">Select all that apply. These set your default filters and influence which stories are surfaced at the top of your briefing.</div>
+      <hr class="deco-rule">
+      <div class="chips-grid">
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Reinsurance"><div class="chip-dot" style="background:#1E4A8A"></div>Reinsurance</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Cyber"><div class="chip-dot" style="background:#6B3FA0"></div>Cyber</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Climate &amp; CAT"><div class="chip-dot" style="background:#2D6B45"></div>Climate &amp; CAT</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Regulatory"><div class="chip-dot" style="background:#B87820"></div>Regulatory</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="M&amp;A"><div class="chip-dot" style="background:#B83228"></div>M&amp;A</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Life &amp; Health"><div class="chip-dot" style="background:#1A1A1A"></div>Life &amp; Health</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Markets"><div class="chip-dot" style="background:#7A7870"></div>Markets</div>
+        <div class="topic-chip" onclick="toggleChip(this)" data-value="Property &amp; Casualty"><div class="chip-dot" style="background:#5A4A3A"></div>P&amp;C</div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-back" onclick="goBack(3)">← Back</button>
+        <button class="btn-next" onclick="goNext(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: COMPANY WATCHLIST -->
+    <div class="step" id="step-4">
+      <div class="step-eyebrow">Company watchlist</div>
+      <div class="step-heading">Which companies do you want to track?</div>
+      <div class="step-sub">When these companies are mentioned in news or press releases, we'll flag them prominently in your briefing.</div>
+      <hr class="deco-rule">
+      <div class="company-grid">
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Swiss Re"><span class="selected-tick">★</span><div class="co-ava" style="background:#E6F2EC;color:#2D6B45;">SR</div><div class="company-name">Swiss Re</div><div class="company-type">Reinsurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Munich Re"><span class="selected-tick">★</span><div class="co-ava" style="background:#1A1A1A;color:#FDF8F0;">MR</div><div class="company-name">Munich Re</div><div class="company-type">Reinsurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Allianz"><span class="selected-tick">★</span><div class="co-ava" style="background:#E8EEF8;color:#1E4A8A;">AZ</div><div class="company-name">Allianz</div><div class="company-type">Primary Insurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Zurich"><span class="selected-tick">★</span><div class="co-ava" style="background:#E6EDF7;color:#1E4A8A;">ZR</div><div class="company-name">Zurich</div><div class="company-type">Primary Insurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Aviva"><span class="selected-tick">★</span><div class="co-ava" style="background:#F5EDD8;color:#9E7420;">AV</div><div class="company-name">Aviva</div><div class="company-type">Primary Insurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Chubb"><span class="selected-tick">★</span><div class="co-ava" style="background:#E8EEF8;color:#1E4A8A;">CB</div><div class="company-name">Chubb</div><div class="company-type">Primary Insurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="AIG"><span class="selected-tick">★</span><div class="co-ava" style="background:#F5E8E7;color:#B83228;">AG</div><div class="company-name">AIG</div><div class="company-type">Primary Insurer</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Aon"><span class="selected-tick">★</span><div class="co-ava" style="background:#E4F0EA;color:#2D6B45;">AN</div><div class="company-name">Aon</div><div class="company-type">Broker</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Marsh McLennan"><span class="selected-tick">★</span><div class="co-ava" style="background:#E8EEF8;color:#1E4A8A;">MM</div><div class="company-name">Marsh McLennan</div><div class="company-type">Broker</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Gallagher"><span class="selected-tick">★</span><div class="co-ava" style="background:#F5EDD8;color:#9E7420;">GB</div><div class="company-name">Gallagher</div><div class="company-type">Broker</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Hiscox"><span class="selected-tick">★</span><div class="co-ava" style="background:#F5E8E7;color:#B83228;">HX</div><div class="company-name">Hiscox</div><div class="company-type">Specialty</div></div>
+        <div class="company-card" onclick="toggleCompany(this)" data-name="Beazley"><span class="selected-tick">★</span><div class="co-ava" style="background:#F0EEF8;color:#6B3FA0;">BZ</div><div class="company-name">Beazley</div><div class="company-type">Specialty</div></div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-back" onclick="goBack(4)">← Back</button>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <button class="btn-skip" onclick="goNext(4)">Skip for now</button>
+          <button class="btn-next" onclick="goNext(4)">Continue →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5: BRIEFING TIME -->
+    <div class="step" id="step-5">
+      <div class="step-eyebrow">Your schedule</div>
+      <div class="step-heading">When do you read your briefing?</div>
+      <div class="step-sub">We'll use this when we launch the daily email digest — sending it to land in your inbox at exactly the right moment.</div>
+      <hr class="deco-rule">
+      <div class="time-grid">
+        <div class="time-card selected" onclick="selectTime(this)" data-value="morning">
+          <span class="time-icon">🌅</span>
+          <div class="time-label">Morning</div>
+          <div class="time-sub">07:00 – 09:00</div>
+        </div>
+        <div class="time-card" onclick="selectTime(this)" data-value="lunchtime">
+          <span class="time-icon">☀️</span>
+          <div class="time-label">Lunchtime</div>
+          <div class="time-sub">12:00 – 13:00</div>
+        </div>
+        <div class="time-card" onclick="selectTime(this)" data-value="evening">
+          <span class="time-icon">🌙</span>
+          <div class="time-label">Evening</div>
+          <div class="time-sub">17:00 – 19:00</div>
+        </div>
+      </div>
+      <div class="nav-row">
+        <button class="btn-back" onclick="goBack(5)">← Back</button>
+        <button class="btn-next gold" id="finish-btn" onclick="saveAndFinish()">Save &amp; Open Briefing →</button>
+      </div>
+      <div class="save-error" id="save-error">Failed to save preferences. Please try again.</div>
+    </div>
+
+    <!-- STEP 6: DONE (shown briefly before redirect) -->
+    <div class="step" id="step-6">
+      <div class="done-screen">
+        <span class="done-icon">✦</span>
+        <div class="done-heading">Your briefing is ready.</div>
+        <div class="done-sub">Insurance Daily is now personalised to your role and interests. Setting things up…</div>
+        <div class="done-summary">
+          <div class="done-summary-label">Your personalisation summary</div>
+          <div class="done-row"><span class="done-row-label">Role</span><span class="done-row-val" id="summary-role">—</span></div>
+          <div class="done-row"><span class="done-row-label">Specialism</span><span class="done-row-val" id="summary-spec">—</span></div>
+          <div class="done-row"><span class="done-row-label">Priority topics</span><span class="done-row-val" id="summary-topics">—</span></div>
+          <div class="done-row"><span class="done-row-label">Watchlist</span><span class="done-row-val" id="summary-companies">—</span></div>
+          <div class="done-row"><span class="done-row-label">Digest time</span><span class="done-row-val" id="summary-time">—</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL      = 'https://ogpfdrpoujrekgbrfilk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncGZkcnBvdWpyZWtnYnJmaWxrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzOTQxODksImV4cCI6MjA4OTk3MDE4OX0.dcE_FaWQEMlYorjj0S9M5jIGCV5U2nobmc5D0RFnApM';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── Auth guard + skip if already onboarded ─────────────────────────────────
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+  const { data: prefs } = await sb.from('user_preferences').select('user_id').eq('user_id', session.user.id).single();
+  if (prefs) { window.location.replace('index.html'); }
+})();
+
+// ── State ──────────────────────────────────────────────────────────────────
+let currentStep = 1;
+const totalSteps = 5; // step 6 is the completion screen
+
+const selections = {
+  role:      null,
+  spec:      null,
+  topics:    [],
+  companies: [],
+  time:      'morning',
+};
+
+// ── Progress ───────────────────────────────────────────────────────────────
+function updateProgress(step) {
+  const pct = Math.round((step / totalSteps) * 100);
+  document.getElementById('prog').style.width = pct + '%';
+  document.getElementById('prog-label').textContent = step <= totalSteps
+    ? `Step ${step} of ${totalSteps}`
+    : 'Complete';
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function goNext(fromStep) {
+  const next = fromStep + 1;
+  document.getElementById('step-' + fromStep).classList.remove('active');
+  const nextEl = document.getElementById('step-' + next);
+  if (nextEl) {
+    nextEl.classList.add('active');
+    currentStep = next;
+    updateProgress(next);
+    window.scrollTo(0, 0);
+  }
+}
+
+function goBack(fromStep) {
+  const prev = fromStep - 1;
+  document.getElementById('step-' + fromStep).classList.remove('active');
+  document.getElementById('step-' + prev).classList.add('active');
+  currentStep = prev;
+  updateProgress(prev);
+  window.scrollTo(0, 0);
+}
+
+// ── Interaction ────────────────────────────────────────────────────────────
+function selectSingle(card, key) {
+  card.parentElement.querySelectorAll('.option-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  selections[key] = card.querySelector('.option-label').textContent.trim();
+}
+
+function toggleChip(chip) {
+  chip.classList.toggle('selected');
+  const val = chip.dataset.value;
+  if (chip.classList.contains('selected')) {
+    if (!selections.topics.includes(val)) selections.topics.push(val);
+  } else {
+    selections.topics = selections.topics.filter(t => t !== val);
+  }
+}
+
+function toggleCompany(card) {
+  card.classList.toggle('selected');
+  const name = card.dataset.name;
+  if (card.classList.contains('selected')) {
+    if (!selections.companies.includes(name)) selections.companies.push(name);
+  } else {
+    selections.companies = selections.companies.filter(c => c !== name);
+  }
+}
+
+function selectTime(card) {
+  document.querySelectorAll('.time-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  selections.time = card.dataset.value;
+}
+
+// ── Save & complete ────────────────────────────────────────────────────────
+async function saveAndFinish() {
+  const btn = document.getElementById('finish-btn');
+  const errEl = document.getElementById('save-error');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  errEl.style.display = 'none';
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.replace('login.html'); return; }
+
+  const { error } = await sb.from('user_preferences').upsert({
+    user_id:             session.user.id,
+    role:                selections.role,
+    specialism:          selections.spec,
+    topics:              selections.topics,
+    watchlist_companies: selections.companies,
+    digest_time:         selections.time,
+  });
+
+  if (error) {
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Save & Open Briefing →';
+    return;
+  }
+
+  // Show done screen briefly then redirect
+  document.getElementById('summary-role').textContent      = selections.role      || 'Not set';
+  document.getElementById('summary-spec').textContent      = selections.spec      || 'Not set';
+  document.getElementById('summary-topics').textContent    = selections.topics.length    ? selections.topics.join(', ')    : 'All topics';
+  document.getElementById('summary-companies').textContent = selections.companies.length ? selections.companies.join(', ') : 'None';
+  document.getElementById('summary-time').textContent      = { morning:'Morning (07:00–09:00)', lunchtime:'Lunchtime (12:00–13:00)', evening:'Evening (17:00–19:00)' }[selections.time] || selections.time;
+
+  document.getElementById('prog').style.width = '100%';
+  document.getElementById('prog-label').textContent = 'Complete';
+  document.getElementById('step-5').classList.remove('active');
+  document.getElementById('step-6').classList.add('active');
+
+  setTimeout(() => window.location.replace('index.html'), 2200);
+}
+
+updateProgress(1);
+</script>
+</body>
+</html>
