@@ -28,7 +28,7 @@ app.add_middleware(
 
 # ── Cache ──────────────────────────────────────────────────────────────────
 _cache: dict = {"data": None, "ts": 0.0}
-CACHE_TTL = 1800  # 30 minutes
+CACHE_TTL = 900  # 15 minutes
 
 # ── RSS Feeds ───────────────────────────────────────────────────────────────
 RSS_FEEDS = [
@@ -52,7 +52,7 @@ Rules:
 - Exclude anything that is only tangentially related to insurance
 - Exclude duplicate stories covering the same event
 - Exclude press releases disguised as news
-- Select the top 5 most significant articles for a senior
+- Select the top 8 most significant articles for a senior
   insurance consultant to read today
 - Rank them by importance and market significance
 - For each selected article write:
@@ -215,7 +215,7 @@ def build_fallback(articles: list) -> dict:
                 "topic":            "Markets",
                 "significance":     5,
             }
-            for a in articles[:5]
+            for a in articles[:8]
         ],
         "ai_processed": False,
     }
