@@ -139,11 +139,11 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
 .sidebar { padding:20px 22px 40px; display:flex; flex-direction:column; }
 
 /* AI AGENT */
-.agent-widget { background:var(--ink); border-radius:4px; padding:18px; margin-bottom:24px; display:flex; flex-direction:column; }
-.agent-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.agent-widget { background:var(--ink); border-radius:4px; padding:18px; margin-bottom:24px; display:flex; flex-direction:column; height:50vh; min-height:320px; }
+.agent-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-shrink:0; }
 .agent-title { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(253,248,240,0.5); }
 .agent-model { font-family:'DM Mono',monospace; font-size:9px; color:rgba(253,248,240,0.3); }
-.agent-messages { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; max-height:280px; overflow-y:auto; }
+.agent-messages { display:flex; flex-direction:column; gap:10px; flex:1; overflow-y:auto; margin-bottom:14px; }
 .agent-messages::-webkit-scrollbar { width:3px; }
 .agent-messages::-webkit-scrollbar-track { background:transparent; }
 .agent-messages::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:2px; }
@@ -153,11 +153,11 @@ body { font-family:'Crimson Pro',Georgia,serif; background:var(--paper); color:v
 .msg.user { align-items:flex-end; }
 .msg.user .msg-bubble { background:var(--gold); color:var(--ink); border-radius:12px 4px 4px 12px; }
 .msg-time { font-family:'DM Mono',monospace; font-size:9px; color:rgba(253,248,240,0.25); padding:0 2px; }
-.agent-suggestions { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; }
+.agent-suggestions { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:10px; flex-shrink:0; }
 .suggestion { font-family:'DM Mono',monospace; font-size:9px; padding:4px 9px; border:1px solid rgba(255,255,255,0.15); border-radius:100px; color:rgba(253,248,240,0.5); cursor:pointer; white-space:nowrap; transition:all 0.12s; background:none; }
 .suggestion:hover { border-color:var(--gold); color:var(--gold); }
 .suggestion.disabled { opacity:0.3; pointer-events:none; }
-.agent-input-row { display:flex; gap:6px; }
+.agent-input-row { display:flex; gap:6px; flex-shrink:0; }
 .agent-input { flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); border-radius:4px; padding:9px 12px; font-family:'Crimson Pro',serif; font-size:13px; color:rgba(253,248,240,0.85); outline:none; transition:border-color 0.15s; min-width:0; }
 .agent-input::placeholder { color:rgba(253,248,240,0.3); font-style:italic; }
 .agent-input:focus { border-color:var(--gold); }
@@ -487,6 +487,7 @@ async function loadNews(force=false) {
     const data = await resp.json();
 
     allArticles = data.articles || [];
+    updateAgentSuggestions(data);
 
     if (data.market_pulse) {
       $('pulse-text').textContent = data.market_pulse;
@@ -620,6 +621,38 @@ async function logRead(url, title, source, topic) {
 document.querySelectorAll('.filter-pill').forEach(p => p.addEventListener('click', ()=>applyFilter(p.dataset.topic)));
 
 // ── INTELLIGENCE AGENT ────────────────────────────────────────────────────
+function updateAgentSuggestions(data) {
+  const topicMap = {
+    'Reinsurance':         { label: 'Renewal trends',    query: 'What are the latest reinsurance renewal trends today?' },
+    'Cyber':               { label: 'Cyber pricing',     query: 'How is cyber insurance pricing moving today?' },
+    'Climate & CAT':       { label: 'CAT losses',        query: 'What catastrophe loss activity is driving market movement today?' },
+    'Regulatory':          { label: 'Regulatory update', query: 'What are the key regulatory changes affecting UK insurers today?' },
+    'Markets':             { label: 'Market dynamics',   query: 'What is driving insurance market dynamics today?' },
+    'M&A':                 { label: 'M&A activity',      query: 'What M&A deals or consolidation news is breaking today?' },
+    'Life & Health':       { label: 'L&H market',        query: 'What is happening in the life and health insurance market today?' },
+    'Property & Casualty': { label: 'P&C outlook',       query: 'What is the current property and casualty market outlook?' },
+  };
+  const fallbacks = [
+    { label: 'ILS market',     query: 'What is happening in the ILS and catastrophe bond market today?' },
+    { label: 'Alt capital',    query: 'What is alternative capital doing to reinsurance markets today?' },
+    { label: 'Pricing trends', query: 'What are the key insurance pricing trends right now?' },
+  ];
+  const seen = new Set();
+  const chips = [];
+  for (const a of (data.articles || []).slice(0, 10)) {
+    if (chips.length >= 5) break;
+    const s = topicMap[a.topic];
+    if (s && !seen.has(a.topic)) { seen.add(a.topic); chips.push(s); }
+  }
+  for (const f of fallbacks) {
+    if (chips.length >= 5) break;
+    if (!chips.find(c => c.label === f.label)) chips.push(f);
+  }
+  $('agent-chips').innerHTML = chips.slice(0, 5).map(c =>
+    `<button class="suggestion" onclick="setQuery(this)" data-query="${esc(c.query)}">${esc(c.label)}</button>`
+  ).join('');
+}
+
 function setAgentLoading(on) {
   $('agent-input').disabled = on;
   $('agent-send').disabled  = on;
