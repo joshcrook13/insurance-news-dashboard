@@ -274,7 +274,9 @@ def _read_news_db() -> Optional[dict]:
 
 def _write_news_db(result: dict) -> None:
     sb_url = os.environ.get("SUPABASE_URL", "")
-    if not sb_url or not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+    key    = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+    logger.info(f"_write_news_db: SUPABASE_URL={'set' if sb_url else 'MISSING'}, SERVICE_ROLE_KEY={'set' if key else 'MISSING'}")
+    if not sb_url or not key:
         return
     h     = _sb_headers()
     today = datetime.utcnow().date().isoformat()
@@ -493,6 +495,9 @@ async def health():
         "status":            "ok",
         "cache_age_seconds": round(age, 1) if age else None,
         "cached":            _cache["data"] is not None,
+        "supabase_url_set":  bool(os.environ.get("SUPABASE_URL")),
+        "supabase_key_set":  bool(os.environ.get("SUPABASE_SERVICE_ROLE_KEY")),
+        "anthropic_key_set": bool(os.environ.get("ANTHROPIC_API_KEY")),
     }
 
 
